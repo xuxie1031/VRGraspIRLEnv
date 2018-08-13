@@ -62,4 +62,4 @@ class VRGraspTask:
         assert 'next_state' in obj
         assert 'terminal' in obj
 
-        return np.asarray(obj['state']), np.asarray(obj['action']), np.asarray(obj['next_state']), int(obj['terminal'])        
+        return np.asarray(obj['next_state']), int(obj['terminal'])        

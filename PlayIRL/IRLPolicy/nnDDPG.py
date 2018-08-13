@@ -31,15 +31,19 @@ class DDPGNet(nn.Module, BaseNet):
 
         self.set_gpu(gpu)
 
+
     def feature(self, state):
         state = self.tensor(state)
         return self.phi_body(state)
 
+
     def actor(self, phi):
         return torch.tanh(self.fc_action(self.actor_body(phi)))
 
+
     def critic(self, phi, a):
         return self.fc_critic(self.critic_body(phi, a))
+
 
     def predict(self, state, to_numpy=False):
         phi = self.feature(state)
@@ -47,3 +51,9 @@ class DDPGNet(nn.Module, BaseNet):
         if to_numpy:
             return action.cpu().detach().numpy()
         return action
+
+
+    def predict_reward(self, state, omega):
+        phi = self.feature(state)
+        phi = phi.cpu().detach().numpy()
+        return omega.dot(phi)

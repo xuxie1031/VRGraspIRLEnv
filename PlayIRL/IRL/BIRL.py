@@ -11,6 +11,10 @@ class BIOIRL(threading.Thread):
         self.rl_model = DDPGModel(self.policy_config)
         self.omega = np.zeros(self.irlconfig.feature_dim)
 
+
     def run(self):
         for irl_iter in range(self.irlconfig.episodes_num):
             self.rl_model.policy_iteration(self.policy_config.episodes_num)
+
+
+    def 

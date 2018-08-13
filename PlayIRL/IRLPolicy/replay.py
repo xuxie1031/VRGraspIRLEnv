@@ -27,4 +27,9 @@ class Replay:
 
 
     def size(self):
-        return len(self.data)  
+        return len(self.data) 
+
+
+    def reset(self):
+         del self.data[:]
+         self.pos = 0
