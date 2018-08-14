@@ -53,7 +53,11 @@ class DDPGNet(nn.Module, BaseNet):
         return action
 
 
-    def predict_reward(self, state, omega):
+    def predict_reward(self, state, omega, to_numpy=False):
         phi = self.feature(state)
         phi = phi.cpu().detach().numpy()
-        return omega.dot(phi)
+        reward = phi.dot(omega)
+        if not to_numpy:
+            reward = self.tensor(reward)
+
+        return reward

@@ -20,12 +20,13 @@ class DDPGModel:
             target_param.copy_(target_param*(1.0-self.config.target_network_mix)+param*self.config.target_network_mix)
     
 
-    def critic_training(self, states, actions, rewards, next_states, terminals, omega):
+    def critic_training(self, states, actions, next_states, terminals, omega):
         phi_next = self.target_network.feature(next_states)
         a_next = self.target_network.actor(phi_next)
-        q_next = self.target_network.critic(phi_next, a_next)
+        mu_next = self.target_network.critic(phi_next, a_next)
+        
+        rewards = self.network.predict_reward(states).unsqueeze(1)
         terminals = self.network.tensor(terminals).unsqueeze(1)
-        rewards = self.network.tensor(rewards).unsqueeze(1)
         q_next = self.config.discount * q_next * (1 - terminals)
         q_next.add_(rewards)
         q_next = q_next.detach()
@@ -69,9 +70,9 @@ class DDPGModel:
 
                 if self.replay.size() >= self.config.min_replay_size:
                     experiences = self.replay.sample()
-                    states, actions, rewards, next_states, terminals = experiences
+                    states, actions, next_states, terminals = experiences
 
-                    self.critic_training(states, actions, rewards, next_states, terminals)
+                    self.critic_training(states, actions, next_states, terminals, omega)
                     self.actor_training(states)
 
                     self.soft_update(self.target_network, self.network)
