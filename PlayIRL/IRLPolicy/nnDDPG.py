@@ -1,4 +1,4 @@
-from nnUtils import *
+from .nnUtils import *
 
 class DDPGNet(nn.Module, BaseNet):
     def __init__(
@@ -62,3 +62,27 @@ class DDPGNet(nn.Module, BaseNet):
             reward = reward.cpu().detach().numpy()
 
         return reward
+
+    
+    def predict_qvalue(self, state, action, omega, to_numpy=False):
+        action = self.tensor(action)
+        omega_t = self.tensor(omega).unsqueeze(-1)
+        phi = self.feature(state)
+        mu = self.critic(phi, action)
+        q = mu.mm(omega_t)
+        if to_numpy:
+            q = q.cpu().detach().numpy()
+
+        return q
+
+
+    def predict_policy_qvalue(self, state, omega, to_numpy=False):
+        omega_t = self.tensor(omega).unsqueeze(-1)
+        phi = self.feature(state)
+        action = self.actor(phi)
+        mu = self.critic(phi, action)
+        q = mu.mm(omega_t)
+        if to_numpy:
+            q = q.cpu().detach().numpy()
+        
+        return q

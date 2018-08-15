@@ -12,8 +12,8 @@ def run_playground():
     policy_config = PolicyConfig()
     policy_config.episodes_num = 1000
 
-    policy_config.network_fn = lambda state_dim, action_dim: DDPGNet(
-        state_dim, action_dim,
+    policy_config.network_fn = lambda state_dim, action_dim, critic_dim: DDPGNet(
+        state_dim, action_dim, critic_dim,
         actor_body=FCBody(state_dim, hidden_units=(300, 200), gate=torch.tanh),
         critic_body=FCBodyWithAction(state_dim, action_dim, hidden_state_dim=400, hidden_units=(300, ), gate=torch.tanh),
         actor_opt_fn=lambda params: torch.optim.Adam(params, lr=1e-4),

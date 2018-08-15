@@ -16,6 +16,11 @@ class Replay:
         self.pos = (self.pos+1) % self.memory_size
     
 
+    def feed_batch(self, experience):
+        experience = zip(*experience)
+        for exp in experience:
+            self.feed(exp)
+
     def sample(self, batch_size=None):
         if batch_size is None:
             batch_size = self.batch_size

@@ -5,14 +5,21 @@ class DDPGModel:
         super(DDPGModel, self).__init__()
         self.config = config
         self.task = config.task_fn()
-        self.network = config.network_fn(self.task.state_dim, self.task.action_dim)
-        self.target_network = config.network_fn(self.task.state_dim, self.task.action_dim)
-        self.replay = config.replay_fn()
+        self.network = config.network_fn(self.task.state_dim, self.task.action_dim, self.task.feature_dim)
+        self.target_network = config.network_fn(self.task.state_dim, self.task.action_dim, self.task.feature_dim)
+        self.replay_D = config.replay_fn()
+        self.replay_M = config.replay_fn()
         self.random_process = config.random_process_fn(self.task.action_dim)
         self.total_step = 0
         self.episodes_num = config.episodes_num
         self.episode_rewards = []
     
+
+    def target_copy(self, target, src):
+        for target_param, param in zip(target.parameters(), src.parameters()):
+            target_param.detach_()
+            target_param.copy_(param)
+
 
     def soft_update(self, target, src):
         for target_param, param in zip(target.parameters(), src.parameters()):
@@ -58,8 +65,21 @@ class DDPGModel:
 
 
     def policy_iteration(self, itr, omega):
-        self.replay.reset()
+        # play through demonstration D
+        print('policy iter from demonstration ...')
+        self.target_copy(self.target_network, self.network)
+        for _ in range(self.config.D_p_episodes_num):
+            rewards = 0.0
+            experiences = self.replay_D.sample()
+            states, actions, next_states, terminals = experiences
 
+            self.critic_training(states, actions, next_states, terminals, omega)
+            self.actor_training(states, omega)
+
+            self.soft_update(self.target_network, self.network)
+
+        # play through replay samples M
+        self.replay_M.reset()
         for p_episode in range(self.config.p_episodes_num):
             rewards = 0.0
             self.random_process.reset_states()
@@ -72,12 +92,12 @@ class DDPGModel:
                 
                 rewards += reward
                 self.total_step += 1
-                self.replay.feed([state, action, next_state, int(terminal)])
+                self.replay_M.feed([state, action, next_state, int(terminal)])
 
                 state = next_state
 
-                if self.replay.size() >= self.config.min_replay_size:
-                    experiences = self.replay.sample()
+                if self.replay_M.size() >= self.config.min_replay_M_size:
+                    experiences = self.replay_M.sample()
                     states, actions, next_states, terminals = experiences
 
                     self.critic_training(states, actions, next_states, terminals, omega)
@@ -92,8 +112,20 @@ class DDPGModel:
 
 
     def qvalue_iteration(self, itr, omega):
-        self.replay.reset()
-        
+        # play through demonstration D
+        print('qvalue iter from demonstration ...')
+        self.target_copy(self.target_network, self.network)
+        for _ in range(self.config.D_q_episodes_num):
+            rewards = 0.0
+            experiences = self.replay_D.sample()
+            states, actions, next_states, terminals = experiences
+
+            self.critic_training(states, actions, next_states, terminals, omega)
+
+            self.soft_update(self.target_network, self.network)
+
+        # play through replay samples M
+        self.replay_M.reset()
         for q_episode in range(self.config.q_episodes_num):
             rewards = 0.0
             self.random_process.reset_states()
@@ -106,12 +138,12 @@ class DDPGModel:
                 
                 rewards += reward
                 self.total_step += 1
-                self.replay.feed([state, action, next_state, int(terminal)])
+                self.replay_M.feed([state, action, next_state, int(terminal)])
 
                 state = next_state
 
-                if self.replay.size() >= self.config.min_replay_size:
-                    experiences = self.replay.sample()
+                if self.replay_M.size() >= self.config.min_replay_M_size:
+                    experiences = self.replay_M.sample()
                     states, actions, next_states, terminals = experiences
 
                     self.critic_training(states, actions, next_states, terminals, omega)
