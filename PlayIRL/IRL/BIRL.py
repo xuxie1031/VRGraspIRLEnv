@@ -72,26 +72,45 @@ class BIOIRL(threading.Thread):
     def generate_halfplane_normals_pi(self, rl_model):
         sampled_action_num = 16
         sampled_states = random_sample_states_around_demos(self.demos_D)
-        sampled_mus = []
+        sampled_delta_mus = []
         for i in range(len(sampled_states)):
             batch_states = np.stack([sampled_states[i, :]]).repeat(sampled_action_num, axis=0)
-            batch_actions = rl_model.networkt.predict(batch_states, to_numpy=True)
+            batch_actions = rl_model.network.predict(batch_states, to_numpy=True)
             batch_mu_pi = rl_model.network.predict_mu(batch_states, batch_actions, to_numpy=True)
 
             action_norm = np.linalg.norm(batch_actions[0, :])
             sampled_actions = random_sample_actions_by_norm(self.policy_config.action_dim, action_norm)
             batch_mu_other = rl_model.network.predict_mu(batch_states, sampled_actions, to_numpy=True)
 
-            sampled_mus.append(batch_mu_pi-batch_mu_other)
+            sampled_delta_mus.append(batch_mu_pi-batch_mu_other)
         
-        sampled_mus = np.concatenate(sampled_mus, axis=0)
-        sampled_mus /= np.linalg.norm(sampled_mus, axis=1, keepdims=True)
+        sampled_delta_mus = np.concatenate(sampled_delta_mus, axis=0)
+        sampled_delta_mus /= np.linalg.norm(sampled_delta_mus, axis=1, keepdims=True)
 
-        return sampled_mus
+        return sampled_delta_mus
 
 
     def generate_halfplane_normals_demos(self, rl_model, demos):
-        pass
+        sampled_action_num = 16
+        demo_states = demos[0]
+        demo_actions = demos[1]
+        demo_delta_mus = []
+        for i in range(len(demo_states)):
+            batch_states = np.stack([demo_states[i, :]]).repeat(sampled_action_num, axis=0)
+            batch_actions = np.stack([demo_actions[i, :]]).repeat(sampled_action_num, axis=0)
+            batch_mu_demo = rl_model.network.predict_mu(batch_states, batch_actions, to_numpy=True)
+
+            action_norm = np.linalg.norm(batch_actions[0, :])
+            sampled_actions = random_sample_actions_by_norm(self.policy_config.action_dim, action_norm)
+            batch_mu_other = rl_model.network.predict_mu(batch_states, sampled_actions, to_numpy=True)
+
+            demo_delta_mus.append(batch_mu_demo-batch_mu_other)
+        
+        demo_delta_mus = np.concatenate(demo_delta_mus, axis=0)
+        demo_delta_mus /= np.linalg.norm(demo_delta_mus, axis=1, keepdims=True)
+
+        return demo_delta_mus
+
 
     def infogap_from_demos(self):
         pass
