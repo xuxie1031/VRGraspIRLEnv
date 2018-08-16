@@ -1,10 +1,11 @@
+import torch
 import numpy as np
 
 class DDPGModel:
     def __init__(self, config):
         super(DDPGModel, self).__init__()
         self.config = config
-        self.task = config.task_fn()
+        self.task = config.task_fn(config.task_name, config.state_dim, config.action_dim)
         self.network = config.network_fn(self.task.state_dim, self.task.action_dim, self.task.feature_dim)
         self.target_network = config.network_fn(self.task.state_dim, self.task.action_dim, self.task.feature_dim)
         self.replay_D = config.replay_fn()
@@ -27,7 +28,7 @@ class DDPGModel:
             target_param.copy_(target_param*(1.0-self.config.target_network_mix)+param*self.config.target_network_mix)
     
 
-    def critic_training(self, states, actions, next_states, terminals, omega):
+    def critic_training(self, states, actions, next_states, terminals, omega, bound_r):
         omega_t = self.network.tensor(omega)
         omega_t.requires_grad = False
         
@@ -36,6 +37,8 @@ class DDPGModel:
         mu_next = self.target_network.critic(phi_next, a_next)
         q_next = mu_next.mm(omega_t.unsqueeze(-1))
         rewards = self.network.predict_reward(states, omega_t)
+        rewards = torch.clamp(rewards, bound_r[0], bound_r[1])
+
         terminals = self.network.tensor(terminals).unsqueeze(-1)
         q_next = self.config.discount * q_next * (1 - terminals)
         q_next.add_(rewards)
@@ -64,7 +67,7 @@ class DDPGModel:
         self.network.actor_opt.step()
 
 
-    def policy_iteration(self, itr, omega):
+    def policy_iteration(self, itr, omega, bound_r):
         # play through demonstration D
         print('policy iter from demonstration ...')
         self.target_copy(self.target_network, self.network)
@@ -73,7 +76,7 @@ class DDPGModel:
             experiences = self.replay_D.sample()
             states, actions, next_states, terminals = experiences
 
-            self.critic_training(states, actions, next_states, terminals, omega)
+            self.critic_training(states, actions, next_states, terminals, omega, bound_r)
             self.actor_training(states, omega)
 
             self.soft_update(self.target_network, self.network)
@@ -100,7 +103,7 @@ class DDPGModel:
                     experiences = self.replay_M.sample()
                     states, actions, next_states, terminals = experiences
 
-                    self.critic_training(states, actions, next_states, terminals, omega)
+                    self.critic_training(states, actions, next_states, terminals, omega, bound_r)
                     self.actor_training(states, omega)
 
                     self.soft_update(self.target_network, self.network)
@@ -111,7 +114,7 @@ class DDPGModel:
             print('policy iter %d episode %d total step %d avg reward %f' % (itr, p_episode, self.total_step, np.mean(np.array(self.episode_rewards[-100:]))))
 
 
-    def qvalue_iteration(self, itr, omega):
+    def qvalue_iteration(self, itr, omega, bound_r):
         # play through demonstration D
         print('qvalue iter from demonstration ...')
         self.target_copy(self.target_network, self.network)
@@ -120,7 +123,7 @@ class DDPGModel:
             experiences = self.replay_D.sample()
             states, actions, next_states, terminals = experiences
 
-            self.critic_training(states, actions, next_states, terminals, omega)
+            self.critic_training(states, actions, next_states, terminals, omega, bound_r)
 
             self.soft_update(self.target_network, self.network)
 
@@ -146,7 +149,7 @@ class DDPGModel:
                     experiences = self.replay_M.sample()
                     states, actions, next_states, terminals = experiences
 
-                    self.critic_training(states, actions, next_states, terminals, omega)
+                    self.critic_training(states, actions, next_states, terminals, omega, bound_r)
 
                     self.soft_update(self.target_network, self.network)
                 

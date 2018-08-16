@@ -63,7 +63,27 @@ class DDPGNet(nn.Module, BaseNet):
 
         return reward
 
-    
+
+    def predict_mu(self, state, action, to_numpy=False):
+        action = self.tensor(action)
+        phi = self.feature(state)
+        mu = self.critic(phi, action)
+        if to_numpy:
+            mu = mu.cpu().detach().numpy()
+
+        return mu
+
+
+    def predict_policy_mu(self, state, to_numpy=False):
+        phi = self.feature(state)
+        action = self.actor(phi)
+        mu = self.critic(phi, action)
+        if to_numpy:
+            mu = mu.cpu().detach().numpy()
+
+        return mu
+
+
     def predict_qvalue(self, state, action, omega, to_numpy=False):
         action = self.tensor(action)
         omega_t = self.tensor(omega).unsqueeze(-1)
