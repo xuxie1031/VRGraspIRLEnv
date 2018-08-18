@@ -13,9 +13,28 @@ class BIOIRL(threading.Thread):
 
         self.rl_model = DDPGModel(self.policy_config)
         self.omega = np.zeros(self.irl_config.feature_dim)
+        self.log_posterior = 0
 
         self.demos_D = None
         self.demos_F = None
+
+
+    def soft_transition(self, new_rl_model, new_omega, new_qvalues_D):
+        new_log_posterior = self.calc_posterior(new_qvalues_D)
+        if sample_prob(min(1, np.exp(new_log_posterior-self.log_posterior))):
+            return deepcopy(new_rl_model), new_omega, new_log_posterior
+        return self.rl_model, self.omega, self.log_posterior
+
+
+    def hard_transition(self, new_rl_model, new_omega, new_qvalues_D, new_halfplane_normals):
+        if not is_omega_in_halfspace(new_omega, new_halfplane_normals)[0]:
+            return self.rl_model, self.omega, self.log_posterior
+        new_log_posterior = self.calc_posterior(new_qvalues_D)
+        if not is_omega_in_halfspace(self.omega, new_halfplane_normals)[0]:
+            return deepcopy(new_rl_model), new_omega, new_log_posterior
+        if sample_prob(min(1, np.exp(new_log_posterior-self.log_posterior))):
+            return deepcopy(new_rl_model), new_omega, new_log_posterior
+
 
     def run(self):
         # policy iteration only
@@ -23,10 +42,10 @@ class BIOIRL(threading.Thread):
             self.rl_model.policy_iteration(irl_iter, self.omega, self.irl_config.bound_r)
 
 
-        # with mcmc sample on omega hard-constraint transition
+        # with mcmc sample transition without omega constraint
         mus_D = self.calc_mu(self.rl_model, self.demos_D, flag='demo')
         qvalues_D = self.calc_qvalue(mus_D, self.omega)
-        log_posterior = self.calc_posterior(qvalues_D)
+        self.log_posterior = self.calc_posterior(qvalues_D)
         for irl_iter in range(self.irl_config.episodes_num):
             new_rl_model = deepcopy(self.rl_model)
             new_omega = random_sample_omega(self.omega)
@@ -39,14 +58,36 @@ class BIOIRL(threading.Thread):
                 new_rl_model.policy_iteration(irl_iter, new_omega, self.irl_config.bound_r)
                 new_mus_D = self.calc_mu(new_rl_model, self.demos_D, flag='demo')
                 new_qvalues_D = self.calc_qvalue(new_mus_D, new_omega)
-                new_log_posterior = self.calc_posterior(new_qvalues_D)
-                if sample_prob(min(1, np.exp(new_log_posterior-log_posterior))):
-                    self.rl_model, self.omega, log_posterior = deepcopy(new_rl_model), new_omega, new_log_posterior
+                self.rl_model, self.omega, self.log_posterior = self.soft_transition(new_rl_model, new_omega, new_qvalues_D)
             else:
-                new_log_posterior = self.calc_posterior(new_qvalues_D)
-                if sample_prob(min(1, np.exp(new_log_posterior-log_posterior))):
-                    self.rl_model, self.omega, log_posterior = deepcopy(new_rl_model), new_omega, new_log_posterior
+                self.rl_model, self.omega, self.log_posterior = self.soft_transition(new_rl_model, new_omega, new_qvalues_D)
             
+
+        # with mcmc sample transition with hard constraint
+        mus_D = self.calc_mu(self.rl_model, self.demos_D, flag='demo')
+        qvalues_D = self.calc_qvalue(mus_D, self.omega)
+        halfplane_normals = self.generate_halfplane_normals_demos(self.rl_model, self.demos_D)
+        self.log_posterior = self.calc_posterior(qvalues_D)
+        for irl_iter in range(self.irl_config.episodes_num):
+            new_rl_model = deepcopy(self.rl_model)
+            new_omega = random_sample_omega_hyperplane_constraint(self.omega, halfplane_normals)
+            if new_omega is None:
+                print('exploration ended. Abort ...')
+                break
+            new_rl_model.qvalue_iteration(irl_iter, new_omega, self.irl_config.bound_r)
+            new_mus_pi = self.calc_mu(new_rl_model, self.demos_D, flag='policy')
+            new_mus_D = self.calc_mu(new_rl_model, self.demos_D, flag='demo')
+            new_qvalues_pi, new_qvalues_D = self.calc_qvalue(new_mus_pi, new_omega), self.calc_qvalue(new_mus_D, new_omega)
+
+            if self.assert_policy_diff(new_qvalues_pi, new_qvalues_D):
+                new_rl_model.policy_iteration(irl_iter, new_omega, self.irl_config.bound_r)
+                new_mus_D = self.calc_mu(new_rl_model, self.demos_D, flag='demo')
+                new_qvalues_D = self.calc_qvalue(new_mus_D, new_omega)
+                new_halfplane_normals = self.generate_halfplane_normals_demos(new_rl_model, self.demos_D)
+                self.rl_model, self.omega, self.log_posterior = self.hard_transition(new_rl_model, new_omega, new_qvalues_D)
+            else:
+                self.rl_model, self.omega, self.log_posterior = self.hard_transition(new_rl_model, new_omega, new_qvalues_D)
+
 
     def calc_mu(self, rl_model, demos, flag='demo'):
         mus = []
