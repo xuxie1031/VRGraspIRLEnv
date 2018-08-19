@@ -6,6 +6,8 @@ import torch
 from PlayIRL import *
 
 def run_playground():
+    rospy.init_node('playground', anonymous=True)
+
     irl_config = IRLConfig()
     irl_config.episodes_num = 10
 
@@ -19,8 +21,13 @@ def run_playground():
         actor_opt_fn=lambda params: torch.optim.Adam(params, lr=1e-4),
         critic_opt_fn=lambda params: torch.optim.Adam(params, lr=1e-3)
     )
-    policy_config.replay_fn = lambda : Replay(memory_size=1000000, batch_size=64)
+    policy_config.replay_fn = lambda : Replay(memory_size=100000, batch_size=64)
     policy_config.random_process_fn = lambda action_dim: OrnsteinUhlenbeckProcess(size=(action_dim, ), std=LinearSchedule(.2))
     policy_config.discount = .99
     policy_config.min_replay_size = 64
     policy_config.target_network_mix = 1e-3
+
+    irl_thread = BIOIRL(irl_config, policy_config)
+    irl_thread.daemon = True
+    irl_thread.start()
+    rospy.spin()

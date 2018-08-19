@@ -24,7 +24,7 @@ class VRGraspTask:
 
     def wait_execution(self):
         while not self.callback_flag:   # timeout variable needed
-            time.sleep(.05)
+            time.sleep(.001)
             pass
 
         self.callback_flag = False         

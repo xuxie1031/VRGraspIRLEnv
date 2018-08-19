@@ -8,6 +8,7 @@ from .sampleUtils import *
 
 class BIOIRL(threading.Thread):
     def __init__(self, irl_config, policy_config):
+        threading.Thread.__init__(self)
         self.irl_config = irl_config
         self.policy_config = policy_config
 
