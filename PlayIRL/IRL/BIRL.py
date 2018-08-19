@@ -18,6 +18,8 @@ class BIOIRL(threading.Thread):
         self.demos_D = None
         self.demos_F = None
 
+        self.load_demos_set()
+
 
     def soft_transition(self, new_rl_model, new_omega, new_qvalues_D):
         new_log_posterior = self.calc_posterior(new_qvalues_D)
@@ -84,9 +86,9 @@ class BIOIRL(threading.Thread):
                 new_mus_D = self.calc_mu(new_rl_model, self.demos_D, flag='demo')
                 new_qvalues_D = self.calc_qvalue(new_mus_D, new_omega)
                 new_halfplane_normals = self.generate_halfplane_normals_demos(new_rl_model, self.demos_D)
-                self.rl_model, self.omega, self.log_posterior = self.hard_transition(new_rl_model, new_omega, new_qvalues_D)
+                self.rl_model, self.omega, self.log_posterior = self.hard_transition(new_rl_model, new_omega, new_qvalues_D, new_halfplane_normals)
             else:
-                self.rl_model, self.omega, self.log_posterior = self.hard_transition(new_rl_model, new_omega, new_qvalues_D)
+                self.rl_model, self.omega, self.log_posterior = self.hard_transition(new_rl_model, new_omega, new_qvalues_D, new_halfplane_normals)
 
 
     def calc_mu(self, rl_model, demos, flag='demo'):
@@ -111,16 +113,14 @@ class BIOIRL(threading.Thread):
 
 
     def generate_halfplane_normals_pi(self, rl_model):
-        sampled_action_num = 16
+        sampled_action_num = 8
         sampled_states = random_sample_states_around_demos(self.demos_D)
         sampled_delta_mus = []
         for i in range(len(sampled_states)):
             batch_states = np.stack([sampled_states[i, :]]).repeat(sampled_action_num, axis=0)
-            batch_actions = rl_model.network.predict(batch_states, to_numpy=True)
-            batch_mu_pi = rl_model.network.predict_mu(batch_states, batch_actions, to_numpy=True)
+            batch_mu_pi = rl_model.network.predict_policy_mu(batch_states, to_numpy=True)
 
-            action_norm = np.linalg.norm(batch_actions[0, :])
-            sampled_actions = random_sample_actions_by_norm(self.policy_config.action_dim, action_norm)
+            sampled_actions = random_sample_actions_by_norm(self.policy_config.action_dim, sampled_action_num)
             batch_mu_other = rl_model.network.predict_mu(batch_states, sampled_actions, to_numpy=True)
 
             sampled_delta_mus.append(batch_mu_pi-batch_mu_other)
@@ -132,7 +132,7 @@ class BIOIRL(threading.Thread):
 
 
     def generate_halfplane_normals_demos(self, rl_model, demos):
-        sampled_action_num = 16
+        sampled_action_num = 8
         demo_states = demos[0]
         demo_actions = demos[1]
         demo_delta_mus = []
@@ -141,8 +141,7 @@ class BIOIRL(threading.Thread):
             batch_actions = np.stack([demo_actions[i, :]]).repeat(sampled_action_num, axis=0)
             batch_mu_demo = rl_model.network.predict_mu(batch_states, batch_actions, to_numpy=True)
 
-            action_norm = np.linalg.norm(batch_actions[0, :])
-            sampled_actions = random_sample_actions_by_norm(self.policy_config.action_dim, action_norm)
+            sampled_actions = random_sample_actions_by_norm(self.policy_config.action_dim, sampled_action_num)
             batch_mu_other = rl_model.network.predict_mu(batch_states, sampled_actions, to_numpy=True)
 
             demo_delta_mus.append(batch_mu_demo-batch_mu_other)

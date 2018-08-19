@@ -7,7 +7,7 @@ def is_omega_in_halfspace(omega, normals):
     if res[res < 0.0].shape[0] == 0:
         return True, 0.0
     else:
-        return False, min(abs(res[res < 0.0]))
+        return False, max(abs(res[res < 0.0]))
 
 
 # sample in omega neighboring space w.r.t one random dim
@@ -39,8 +39,8 @@ def random_sample_states_around_demos(demos, step_size=.1):
     return states + states_step
 
 
-def random_sample_actions_by_norm(action_dim, action_norm, action_num=8):
-    actions = np.random.randn(action_num, *action_dim)*action_norm
+def random_sample_actions_by_norm(action_dim, action_num=8):
+    actions = np.random.randn(action_num, *action_dim)
 
     return actions
 
