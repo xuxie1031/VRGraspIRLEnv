@@ -16,6 +16,9 @@ class VRGraspTask:
         self.json_msg = ''
         self.callback_flag = False
 
+        while self.pub.get_num_connections() == 0:
+            time.sleep(.001)
+
 
     def step_callback(self, msg):
         self.json_msg = msg.data
@@ -24,7 +27,7 @@ class VRGraspTask:
 
     def wait_execution(self):
         while not self.callback_flag:   # timeout variable needed
-            time.sleep(.001)
+            time.sleep(.000001)
             pass
 
         self.callback_flag = False         
@@ -63,3 +66,18 @@ class VRGraspTask:
         assert 'terminal' in obj
 
         return np.asarray(obj['next_state']), int(obj['terminal'])        
+
+    
+    def grasp_check(self):
+        msg_dict = {'cmd':'grasp_check'}
+        msg = json.dumps(msg_dict)
+        self.pub.publish(msg)
+
+        self.wait_execution()
+
+        obj = json.loads(self.json_msg)
+        assert 'cmd' in obj
+        assert obj['cmd'] == 'grasp_check'
+        assert 'flag' in obj
+
+        return int(obj['flag'])

@@ -28,7 +28,7 @@ class DDPGModel:
             target_param.copy_(target_param*(1.0-self.config.target_network_mix)+param*self.config.target_network_mix)
     
 
-    def critic_training(self, states, actions, next_states, terminals, omega, bound_r):
+    def critic_training(self, states, actions, next_states, terminals, flags, omega, bound_r):
         omega_t = self.network.tensor(omega)
         omega_t.requires_grad = False
         
@@ -40,6 +40,10 @@ class DDPGModel:
         rewards = torch.clamp(rewards, bound_r[0], bound_r[1])
 
         terminals = self.network.tensor(terminals).unsqueeze(-1)
+        flags = self.network.tensor(flags).unsqueeze(-1)
+        rewards[flags[terminals == 1] > 0.0] = bound_r[1]
+        rewards[flags[terminals == 1] < 0.0] = bound_r[0]
+
         q_next = self.config.discount * q_next * (1 - terminals)
         q_next.add_(rewards)
         q_next = q_next.detach()
@@ -74,9 +78,9 @@ class DDPGModel:
         for _ in range(self.config.D_p_episodes_num):
             rewards = 0.0
             experiences = self.replay_D.sample()
-            states, actions, next_states, terminals = experiences
+            states, actions, next_states, terminals, flags = experiences
 
-            self.critic_training(states, actions, next_states, terminals, omega, bound_r)
+            self.critic_training(states, actions, next_states, terminals, flags, omega, bound_r)
             self.actor_training(states, omega)
 
             self.soft_update(self.target_network, self.network)
@@ -95,15 +99,17 @@ class DDPGModel:
                 
                 rewards += reward
                 self.total_step += 1
-                self.replay_M.feed([state, action, next_state, int(terminal)])
+
+                flag = self.task.grasp_check() if terminal else 0
+                self.replay_M.feed([state, action, next_state, int(terminal), int(flag)])
 
                 state = next_state
 
                 if self.replay_M.size() >= self.config.min_replay_M_size:
                     experiences = self.replay_M.sample()
-                    states, actions, next_states, terminals = experiences
+                    states, actions, next_states, terminals, flags = experiences
 
-                    self.critic_training(states, actions, next_states, terminals, omega, bound_r)
+                    self.critic_training(states, actions, next_states, terminals, flags, omega, bound_r)
                     self.actor_training(states, omega)
 
                     self.soft_update(self.target_network, self.network)
@@ -121,9 +127,9 @@ class DDPGModel:
         for _ in range(self.config.D_q_episodes_num):
             rewards = 0.0
             experiences = self.replay_D.sample()
-            states, actions, next_states, terminals = experiences
+            states, actions, next_states, terminals, flags = experiences
 
-            self.critic_training(states, actions, next_states, terminals, omega, bound_r)
+            self.critic_training(states, actions, next_states, terminals, flags, omega, bound_r)
 
             self.soft_update(self.target_network, self.network)
 
@@ -141,15 +147,17 @@ class DDPGModel:
                 
                 rewards += reward
                 self.total_step += 1
-                self.replay_M.feed([state, action, next_state, int(terminal)])
+
+                flag = self.task.grasp_check() if terminal else 0
+                self.replay_M.feed([state, action, next_state, int(terminal), int(flag)])
 
                 state = next_state
 
                 if self.replay_M.size() >= self.config.min_replay_M_size:
                     experiences = self.replay_M.sample()
-                    states, actions, next_states, terminals = experiences
+                    states, actions, next_states, terminals, flags = experiences
 
-                    self.critic_training(states, actions, next_states, terminals, omega, bound_r)
+                    self.critic_training(states, actions, next_states, terminals, flags, omega, bound_r)
 
                     self.soft_update(self.target_network, self.network)
                 

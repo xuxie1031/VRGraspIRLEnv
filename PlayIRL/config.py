@@ -18,6 +18,8 @@ class PolicyConfig:
 
         self.state_dim = 0
         self.action_dim = 0
+        self.terminal_dim = 0
+        self.flag_dim = 0
         self.task_name = ''
 
 class IRLConfig:

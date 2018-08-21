@@ -153,7 +153,7 @@ class BIOIRL(threading.Thread):
         return demo_delta_mus
 
 
-    def infogap_from_demos(self):
+    def infogap_from_demos(self, demos):
         pass
 
 
@@ -178,7 +178,7 @@ class BIOIRL(threading.Thread):
 
     def load_demos_set(self):
         demos_path = os.path.join('..','DemoData')
-        demos_seg = [self.policy_config.state_dim, self.policy_config.action_dim, self.policy_config.state_dim, self.policy_config.terminal_dim]
+        demos_seg = [self.policy_config.state_dim, self.policy_config.action_dim, self.policy_config.state_dim, self.policy_config.terminal_dim, self.policy_config.flag_dim]
         self.demos_D = np.genfromtxt(os.path.join(demos_path, 'demos_D.csv'), delimiter=',')
         self.demos_F = np.genfromtxt(os.path.join(demos_path, 'demos_F.csv'), delimiter=',')
 
