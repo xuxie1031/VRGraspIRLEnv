@@ -86,7 +86,7 @@ class DDPGModel:
             self.soft_update(self.target_network, self.network)
 
         # play through replay samples M
-        self.replay_M.reset()
+        # self.replay_M.reset()
         for p_episode in range(self.config.p_episodes_num):
             rewards = 0.0
             self.random_process.reset_states()
@@ -134,7 +134,7 @@ class DDPGModel:
             self.soft_update(self.target_network, self.network)
 
         # play through replay samples M
-        self.replay_M.reset()
+        # self.replay_M.reset()
         for q_episode in range(self.config.q_episodes_num):
             rewards = 0.0
             self.random_process.reset_states()

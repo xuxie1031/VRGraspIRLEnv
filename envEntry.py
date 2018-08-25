@@ -14,6 +14,10 @@ def run_playground():
     policy_config = PolicyConfig()
     policy_config.episodes_num = 1000
 
+    policy_config.task_fn = lambda task_name, state_dim, action_dim: VRGraspTask(
+        task_name, state_dim, action_dim
+    )
+
     policy_config.network_fn = lambda state_dim, action_dim, critic_dim: DDPGNet(
         state_dim, action_dim, critic_dim,
         actor_body=FCBody(state_dim, hidden_units=(300, 200), gate=torch.tanh),
