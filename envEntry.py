@@ -10,9 +10,24 @@ def run_playground():
 
     irl_config = IRLConfig()
     irl_config.episodes_num = 10
+    irl_config.batch_size_demos = 1
+    irl_config.bound_r = (-1, 1)
 
     policy_config = PolicyConfig()
-    policy_config.episodes_num = 1000
+    policy_config.D_p_episodes_num = 100
+    policy_config.D_q_episodes_num = 100
+    policy_config.p_episodes_num = 100
+    policy_config.q_episodes_num = 100
+
+    policy_config.task_name = 'VRGrasp'
+    policy_config.state_dim = 9
+    policy_config.action_dim = 4
+    policy_config.terminal_dim = 1
+    policy_config.flag_dim = 1
+
+    policy_config.target_network_mix = 1e-3
+    policy_config.min_replay_size = 10
+    policy_config.discount = .99
 
     policy_config.task_fn = lambda task_name, state_dim, action_dim: VRGraspTask(
         task_name, state_dim, action_dim
@@ -35,3 +50,7 @@ def run_playground():
     irl_thread.daemon = True
     irl_thread.start()
     rospy.spin()
+
+
+if __name__ == '__main__':
+    run_playground()

@@ -19,7 +19,7 @@ class BIOIRL(threading.Thread):
         self.demos_D = None
         self.demos_F = None
 
-        self.load_demos_set()
+        # self.load_demos_set()
 
 
     def soft_transition(self, new_rl_model, new_omega, new_qvalues_D):

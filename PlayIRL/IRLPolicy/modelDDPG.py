@@ -12,7 +12,6 @@ class DDPGModel:
         self.replay_M = config.replay_fn()
         self.random_process = config.random_process_fn(self.task.action_dim)
         self.total_step = 0
-        self.episodes_num = config.episodes_num
         self.episode_rewards = []
     
 

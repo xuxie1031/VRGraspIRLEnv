@@ -14,8 +14,6 @@ class PolicyConfig:
         self.min_replay_size = 0
         self.discount = 0
 
-        self.bound_r = (0, 0)
-
         self.state_dim = 0
         self.action_dim = 0
         self.terminal_dim = 0
@@ -27,3 +25,4 @@ class IRLConfig:
         self.episodes_num = 0
         self.batch_size_demos = 0
         self.gamma = 0
+        self.bound_r = (0, 0)
