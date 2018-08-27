@@ -26,9 +26,21 @@ class VRGraspTask:
 
 
     def wait_execution(self):
+        start_t = time.time()
         while not self.callback_flag:   # timeout variable needed
-            time.sleep(.000001)
-            pass
+            time.sleep(.000000001)
+            end_t = time.time()
+            if end_t-start_t > 5.0:     # 5.0s waiting to resend
+                # print 'message loss'
+                msg_dict = {'cmd': 'repeat'}
+                msg = json.dumps(msg_dict)
+
+                # self.sub.unregister()
+                # time.sleep(1.0)
+                # self.sub = rospy.Subscriber('/irl_trainer_sub', String, callback=self.step_callback, queue_size=1)
+
+                start_t = time.time()
+                self.pub.publish(msg)
 
         self.callback_flag = False         
 
@@ -50,6 +62,7 @@ class VRGraspTask:
 
 
     def step(self, state, action):
+        action = action.clip(-1.0, 1.0)
         msg_dict = {'cmd':'step', 'state':state.tolist(), 'action':action.tolist()}
         msg = json.dumps(msg_dict)
         self.pub.publish(msg)

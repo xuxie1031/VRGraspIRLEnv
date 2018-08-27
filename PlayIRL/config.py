@@ -10,6 +10,7 @@ class PolicyConfig:
         self.p_episodes_num = 0
         self.q_episodes_num = 0
 
+        self.critic_dim = 0
         self.target_network_mix = 0
         self.min_replay_size = 0
         self.discount = 0
@@ -22,6 +23,7 @@ class PolicyConfig:
 
 class IRLConfig:
     def __init__(self):
+        self.feature_dim = 0
         self.episodes_num = 0
         self.batch_size_demos = 0
         self.gamma = 0

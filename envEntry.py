@@ -1,4 +1,4 @@
-# /usr/bin/env python
+#! /usr/bin/env python
 
 import rospy
 import torch
@@ -9,9 +9,10 @@ def run_playground():
     rospy.init_node('playground', anonymous=True)
 
     irl_config = IRLConfig()
-    irl_config.episodes_num = 10
+    irl_config.feature_dim = 64
+    irl_config.episodes_num = 10000
     irl_config.batch_size_demos = 1
-    irl_config.bound_r = (-1, 1)
+    irl_config.bound_r = (-1.0, 1.0)
 
     policy_config = PolicyConfig()
     policy_config.D_p_episodes_num = 100
@@ -28,15 +29,18 @@ def run_playground():
     policy_config.target_network_mix = 1e-3
     policy_config.min_replay_size = 10
     policy_config.discount = .99
+    policy_config.critic_dim = irl_config.feature_dim
 
     policy_config.task_fn = lambda task_name, state_dim, action_dim: VRGraspTask(
         task_name, state_dim, action_dim
     )
 
+    # critic dim as feature dim
     policy_config.network_fn = lambda state_dim, action_dim, critic_dim: DDPGNet(
         state_dim, action_dim, critic_dim,
-        actor_body=FCBody(state_dim, hidden_units=(300, 200), gate=torch.tanh),
-        critic_body=FCBodyWithAction(state_dim, action_dim, hidden_state_dim=400, hidden_units=(300, ), gate=torch.tanh),
+        phi_body=FCBody(state_dim, hidden_units=(critic_dim, ), gate=torch.tanh),
+        actor_body=FCBody(critic_dim, hidden_units=(300, 200), gate=torch.tanh),
+        critic_body=FCBodyWithAction(critic_dim, action_dim, hidden_state_dim=400, hidden_units=(300, ), gate=torch.tanh),
         actor_opt_fn=lambda params: torch.optim.Adam(params, lr=1e-4),
         critic_opt_fn=lambda params: torch.optim.Adam(params, lr=1e-3)
     )

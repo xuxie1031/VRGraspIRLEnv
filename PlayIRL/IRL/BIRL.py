@@ -13,7 +13,7 @@ class BIOIRL(threading.Thread):
         self.policy_config = policy_config
 
         self.rl_model = DDPGModel(self.policy_config)
-        self.omega = np.zeros(self.irl_config.feature_dim)
+        self.omega = np.ones(self.irl_config.feature_dim)
         self.log_posterior = 0
 
         self.demos_D = None

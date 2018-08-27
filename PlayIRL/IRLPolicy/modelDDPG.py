@@ -3,11 +3,10 @@ import numpy as np
 
 class DDPGModel:
     def __init__(self, config):
-        super(DDPGModel, self).__init__()
         self.config = config
         self.task = config.task_fn(config.task_name, config.state_dim, config.action_dim)
-        self.network = config.network_fn(self.task.state_dim, self.task.action_dim, self.task.feature_dim)
-        self.target_network = config.network_fn(self.task.state_dim, self.task.action_dim, self.task.feature_dim)
+        self.network = config.network_fn(self.task.state_dim, self.task.action_dim, config.critic_dim)
+        self.target_network = config.network_fn(self.task.state_dim, self.task.action_dim, config.critic_dim)
         self.replay_D = config.replay_fn()
         self.replay_M = config.replay_fn()
         self.random_process = config.random_process_fn(self.task.action_dim)
@@ -39,9 +38,11 @@ class DDPGModel:
         rewards = torch.clamp(rewards, bound_r[0], bound_r[1])
 
         terminals = self.network.tensor(terminals).unsqueeze(-1)
-        flags = self.network.tensor(flags).unsqueeze(-1)
-        rewards[flags[terminals == 1] > 0.0] = bound_r[1]
-        rewards[flags[terminals == 1] < 0.0] = bound_r[0]
+        flags = self.network.tensor(flags)
+
+        rewards[(flags == 0.0).nonzero()] = 0.0
+        rewards[(flags > 0.0).nonzero()] = bound_r[1]
+        rewards[(flags < 0.0).nonzero()] = bound_r[0]
 
         q_next = self.config.discount * q_next * (1 - terminals)
         q_next.add_(rewards)
@@ -75,14 +76,14 @@ class DDPGModel:
         print('policy iter from demonstration ...')
         self.target_copy(self.target_network, self.network)
         for _ in range(self.config.D_p_episodes_num):
-            rewards = 0.0
-            experiences = self.replay_D.sample()
-            states, actions, next_states, terminals, flags = experiences
+            if self.replay_D.size() >= self.config.min_replay_size:
+                experiences = self.replay_D.sample()
+                states, actions, next_states, terminals, flags = experiences
 
-            self.critic_training(states, actions, next_states, terminals, flags, omega, bound_r)
-            self.actor_training(states, omega)
+                self.critic_training(states, actions, next_states, terminals, flags, omega, bound_r)
+                self.actor_training(states, omega)
 
-            self.soft_update(self.target_network, self.network)
+                self.soft_update(self.target_network, self.network)
 
         # play through replay samples M
         # self.replay_M.reset()
@@ -94,7 +95,8 @@ class DDPGModel:
             while True:
                 reward = self.network.predict_reward(np.stack([state]), omega, True).item()
                 action = self.network.predict(np.stack([state]), True).flatten()
-                next_state, terminal = self.task.step(action)
+                action += self.random_process.sample()
+                next_state, terminal = self.task.step(state, action)
                 
                 rewards += reward
                 self.total_step += 1
@@ -104,7 +106,7 @@ class DDPGModel:
 
                 state = next_state
 
-                if self.replay_M.size() >= self.config.min_replay_M_size:
+                if self.replay_M.size() >= self.config.min_replay_size:
                     experiences = self.replay_M.sample()
                     states, actions, next_states, terminals, flags = experiences
 
@@ -124,13 +126,13 @@ class DDPGModel:
         print('qvalue iter from demonstration ...')
         self.target_copy(self.target_network, self.network)
         for _ in range(self.config.D_q_episodes_num):
-            rewards = 0.0
-            experiences = self.replay_D.sample()
-            states, actions, next_states, terminals, flags = experiences
+            if self.replay_D.size() >= self.config.min_replay_size:
+                experiences = self.replay_D.sample()
+                states, actions, next_states, terminals, flags = experiences
 
-            self.critic_training(states, actions, next_states, terminals, flags, omega, bound_r)
+                self.critic_training(states, actions, next_states, terminals, flags, omega, bound_r)
 
-            self.soft_update(self.target_network, self.network)
+                self.soft_update(self.target_network, self.network)
 
         # play through replay samples M
         # self.replay_M.reset()
@@ -142,7 +144,8 @@ class DDPGModel:
             while True:
                 reward = self.network.predict_reward(np.stack([state]), omega, True).item()
                 action = self.network.predict(np.stack([state]), True).flatten()
-                next_state, terminal = self.task.step(action)
+                action += self.random_process.sample()
+                next_state, terminal = self.task.step(state, action)
                 
                 rewards += reward
                 self.total_step += 1
@@ -152,7 +155,7 @@ class DDPGModel:
 
                 state = next_state
 
-                if self.replay_M.size() >= self.config.min_replay_M_size:
+                if self.replay_M.size() >= self.config.min_replay_size:
                     experiences = self.replay_M.sample()
                     states, actions, next_states, terminals, flags = experiences
 
