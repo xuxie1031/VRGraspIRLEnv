@@ -13,6 +13,8 @@ def run_playground():
     irl_config.episodes_num = 10000
     irl_config.batch_size_demos = 1
     irl_config.bound_r = (-1.0, 1.0)
+    irl_config.gamma = 1.0
+    irl_config.gamma_infogap = 1.0
 
     policy_config = PolicyConfig()
     policy_config.D_p_episodes_num = 100

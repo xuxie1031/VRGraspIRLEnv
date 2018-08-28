@@ -31,16 +31,16 @@ def random_sample_omega_hyperplane_constraint(omega, normals, step_size=.05, sea
     return None
             
 
-def random_sample_states_around_demos(demos, step_size=.1):
+def random_sample_states_around_demos(demos, step_size=.01):
     states = demos[0]
-    states_step = np.random.randn(*states.shape)*step_size
+    states_step = np.random.randn(*states.shape)
     states_step /= np.linalg.norm(states_step, axis=1, keepdims=True)
 
-    return states + states_step
+    return states + states_step*step_size
 
 
 def random_sample_actions_by_norm(action_dim, action_num=8):
-    actions = np.random.randn(action_num, *action_dim)
+    actions = np.random.uniform(-1.0, 1.0, (action_num, action_dim))
 
     return actions
 

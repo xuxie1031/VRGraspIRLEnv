@@ -27,4 +27,5 @@ class IRLConfig:
         self.episodes_num = 0
         self.batch_size_demos = 0
         self.gamma = 0
+        self.gamma_infogap = 0
         self.bound_r = (0, 0)
