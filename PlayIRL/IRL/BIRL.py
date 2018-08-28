@@ -1,5 +1,6 @@
 import os
 import threading
+import pickle
 from copy import deepcopy
 import numpy as np
 
@@ -15,6 +16,11 @@ class BIOIRL(threading.Thread):
         self.rl_model = DDPGModel(self.policy_config)
         self.omega = np.ones(self.irl_config.feature_dim)
         self.log_posterior = 0
+
+        if self.irl_config.b_load:
+            with open('env_irl_model{0}.pkl'.format(self.irl_config.save_flag), 'rb') as fi:
+                self.irl_config, self.policy_config, self.rl_model, self.omega, self.log_posterior = pickle.load(fi)
+                # load halfplane if hard constraint
 
         self.demos_D = None
         self.demos_F = None
@@ -42,7 +48,12 @@ class BIOIRL(threading.Thread):
     def run(self):
         # policy iteration only
         for irl_iter in range(self.irl_config.episodes_num):
-            if irl_iter % self.irl_config.evalT == 0:
+            if self.irl_config.evalT > 0 and irl_iter % self.irl_config.evalT == 0:
+                with open('env_irl_model{0}.pkl'.format(self.irl_config.save_flag), 'wb') as fo:
+                    data = [self.irl_config, self.policy_config, self.rl_model, self.omega, self.log_posterior]
+                    pickle.dump(data, fo, pickle.HIGHEST_PROTOCOL)
+                fo.close()
+
                 eval_reward = self.rl_model.qvalue_iteration(irl_iter, self.omega, self.irl_config.bound_r, deterministic=True)
                 print('itr %d evaluation reward %f' % (irl_iter, eval_reward))
             self.rl_model.policy_iteration(irl_iter, self.omega, self.irl_config.bound_r)

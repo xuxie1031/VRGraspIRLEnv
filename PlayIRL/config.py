@@ -29,3 +29,6 @@ class IRLConfig:
         self.gamma = 0
         self.gamma_infogap = 0
         self.bound_r = (0, 0)
+        self.evalT = 10
+        self.save_flag = '_sparse_reward'
+        self.b_load = False
