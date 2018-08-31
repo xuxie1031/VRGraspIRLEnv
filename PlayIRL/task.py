@@ -31,7 +31,7 @@ class VRGraspTask:
             time.sleep(.000000001)
             end_t = time.time()
             if end_t-start_t > 5.0:     # 5.0s waiting to resend
-                # print 'message loss'
+                print('message loss')
                 msg_dict = {'cmd': 'repeat'}
                 msg = json.dumps(msg_dict)
 

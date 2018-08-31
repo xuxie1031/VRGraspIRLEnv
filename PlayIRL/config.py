@@ -5,10 +5,14 @@ class PolicyConfig:
         self.replay_fn = None
         self.random_process_fn = None
 
+        self.actor_lr = 0
+        self.critic_lr = 0
+
         self.D_p_episodes_num = 0
         self.D_q_episodes_num = 0
         self.p_episodes_num = 0
         self.q_episodes_num = 0
+        self.e_episodes_num = 0
 
         self.critic_dim = 0
         self.target_network_mix = 0
@@ -21,6 +25,7 @@ class PolicyConfig:
         self.flag_dim = 0
         self.task_name = ''
 
+
 class IRLConfig:
     def __init__(self):
         self.feature_dim = 0
@@ -29,6 +34,6 @@ class IRLConfig:
         self.gamma = 0
         self.gamma_infogap = 0
         self.bound_r = (0, 0)
-        self.evalT = 10
+        self.evalT = 0
         self.save_flag = '_sparse_reward'
         self.b_load = False
