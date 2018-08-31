@@ -1,3 +1,4 @@
+import copy
 import numpy as np
 
 class Replay:
@@ -36,5 +37,14 @@ class Replay:
 
 
     def reset(self):
-         del self.data[:]
-         self.pos = 0
+        del self.data[:]
+        self.pos = 0
+
+
+    def set_params(self, memory_size, batch_size, data, pos):
+        self.memory_size, self.batch_size, self.pos = memory_size, batch_size, pos
+        self.data = copy.copy(data)
+
+
+    def get_params(self):
+        return self.memory_size, self.batch_size, self.data, self.pos

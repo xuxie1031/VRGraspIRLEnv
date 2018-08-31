@@ -13,7 +13,6 @@ class DDPGModel:
         self.total_step = 0
         self.p_episode_rewards = []
         self.q_episode_rewards = []
-        self.eval_rewards = []
     
 
     def target_copy(self, target, src):
@@ -42,7 +41,7 @@ class DDPGModel:
         terminals = self.network.tensor(terminals).unsqueeze(-1)
         flags = self.network.tensor(flags)
 
-        rewards[(flags == 0.0).nonzero()] = 0.0
+        # rewards[(flags == 0.0).nonzero()] = 0.0
         rewards[(flags > 0.0).nonzero()] = bound_r[1]
         rewards[(flags < 0.0).nonzero()] = bound_r[0]
 
@@ -123,25 +122,21 @@ class DDPGModel:
             print('policy iter %d episode %d total step %d avg reward %f' % (itr, p_episode, self.total_step, np.mean(np.array(self.p_episode_rewards[-100:]))))
 
 
-    def qvalue_iteration(self, itr, omega, bound_r, deterministic=False):
+    def qvalue_iteration(self, itr, omega, bound_r):
         # play through demonstration D
-        if not deterministic:
-            print('qvalue iter from demonstration ...')
-            self.target_copy(self.target_network, self.network)
-            for _ in range(self.config.D_q_episodes_num):
-                if self.replay_D.size() >= self.config.min_replay_size:
-                    experiences = self.replay_D.sample()
-                    states, actions, next_states, terminals, flags = experiences
+        print('qvalue iter from demonstration ...')
+        self.target_copy(self.target_network, self.network)
+        for _ in range(self.config.D_q_episodes_num):
+            if self.replay_D.size() >= self.config.min_replay_size:
+                experiences = self.replay_D.sample()
+                states, actions, next_states, terminals, flags = experiences
 
-                    self.critic_training(states, actions, next_states, terminals, flags, omega, bound_r)
+                self.critic_training(states, actions, next_states, terminals, flags, omega, bound_r)
 
-                    self.soft_update(self.target_network, self.network)
-        else:
-            print('evaluation ...')
+                self.soft_update(self.target_network, self.network)
 
         # play through replay samples M
         # self.replay_M.reset()
-        eval_episode_rewards = []
         for q_episode in range(self.config.q_episodes_num):
             rewards = 0.0
             self.random_process.reset_states()
@@ -150,20 +145,18 @@ class DDPGModel:
             while True:
                 reward = self.network.predict_reward(np.stack([state]), omega, True).item()
                 action = self.network.predict(np.stack([state]), True).flatten()
-                if not deterministic:
-                    action += self.random_process.sample()
+                action += self.random_process.sample()
                 next_state, terminal = self.task.step(state, action)
                 
                 rewards += reward
-                self.total_step += 1
+                # self.total_step += 1
 
                 flag = self.task.grasp_check() if terminal else 0
-                if not deterministic:
-                    self.replay_M.feed([state, action, next_state, int(terminal), int(flag)])
+                self.replay_M.feed([state, action, next_state, int(terminal), int(flag)])
 
                 state = next_state
 
-                if not deterministic and self.replay_M.size() >= self.config.min_replay_size:
+                if self.replay_M.size() >= self.config.min_replay_size:
                     experiences = self.replay_M.sample()
                     states, actions, next_states, terminals, flags = experiences
 
@@ -173,11 +166,33 @@ class DDPGModel:
                 
                 if terminal: break
             
-            if deterministic:
-                eval_episode_rewards.append(rewards)
-            else:
-                self.q_episode_rewards.append(rewards)
-                print('qvalue iter %d episode %d total step %d avg reward %f' % (itr, q_episode, self.total_step, np.mean(np.array(self.q_episode_rewards[-100:]))))
+            self.q_episode_rewards.append(rewards)
+            print('qvalue iter %d episode %d total step %d avg reward %f' % (itr, q_episode, self.total_step, np.mean(np.array(self.q_episode_rewards[-100:]))))
 
-        if deterministic:
-            return np.mean(eval_episode_rewards)
+        
+    def policy_evaluation(self, itr, omega, bound_r):
+        # evaluation deterministic action
+        print('evaluation iter from demonstration ...')
+        eval_episode_rewards = []
+        for _ in range(self.config.e_episodes_num):
+            rewards = 0.0
+            state = self.task.reset()
+            steps = 0
+
+            while steps < 1000:
+                reward = self.network.predict_reward(np.stack([state]), omega, True).item()
+                action = self.network.predict(np.stack([state]), True).flatten()
+                next_state, terminal = self.task.step(state, action)
+                
+                rewards += reward
+                steps += 1
+                self.task.grasp_check()
+                flag = self.task.grasp_check() if terminal else 0
+                state = next_state
+                
+                if terminal: break
+
+            
+            eval_episode_rewards.append(rewards)
+
+        return np.mean(eval_episode_rewards)

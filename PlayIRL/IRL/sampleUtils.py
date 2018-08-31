@@ -11,7 +11,7 @@ def is_omega_in_halfspace(omega, normals):
 
 
 # sample in omega neighboring space w.r.t one random dim
-def random_sample_omega(omega, step_size=.05):
+def random_sample_omega(omega, step_size=.01):
     num_dim = len(omega)
     direction = randint(0, 1)*2-1
     dim = randint(0, num_dim-1)
@@ -20,7 +20,7 @@ def random_sample_omega(omega, step_size=.05):
     return omega
 
 
-def random_sample_omega_hyperplane_constraint(omega, normals, step_size=.05, search_itr=5, trial_num_per_itr=8):
+def random_sample_omega_hyperplane_constraint(omega, normals, step_size=.01, search_itr=5, trial_num_per_itr=8):
     for _ in range(search_itr):
         for _ in range(trial_num_per_itr):
             delta_omega = np.random.randn(*omega.shape)*step_size
