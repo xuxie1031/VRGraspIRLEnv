@@ -37,3 +37,5 @@ class IRLConfig:
         self.evalT = 0
         self.save_flag = '_sparse_reward'
         self.b_load = False
+
+        self.maxent_lr = 1e-2

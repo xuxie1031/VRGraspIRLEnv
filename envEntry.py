@@ -8,6 +8,7 @@ from PlayIRL import *
 def run_playground():
     rospy.init_node('playground', anonymous=True)
 
+    ''' BIRL Setup '''
     irl_config = IRLConfig()
     irl_config.feature_dim = 64
     irl_config.episodes_num = 10000
@@ -40,6 +41,13 @@ def run_playground():
     policy_config.task_fn = lambda task_name, state_dim, action_dim: VRGraspTask(
         task_name, state_dim, action_dim
     )
+
+
+    ''' MaxEnt Setup '''
+
+
+    ''' SSIRL Setup '''
+
 
     # critic dim as feature dim
     policy_config.network_fn = lambda state_dim, action_dim, critic_dim: DDPGNet(

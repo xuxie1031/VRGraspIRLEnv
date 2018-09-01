@@ -13,6 +13,7 @@ class DDPGModel:
         self.total_step = 0
         self.p_episode_rewards = []
         self.q_episode_rewards = []
+        self.eval_episode_rewards = []
     
 
     def target_copy(self, target, src):
@@ -96,7 +97,7 @@ class DDPGModel:
             while True:
                 reward = self.network.predict_reward(np.stack([state]), omega, True).item()
                 action = self.network.predict(np.stack([state]), True).flatten()
-                action += self.random_process.sample()
+                # action += self.random_process.sample()
                 next_state, terminal = self.task.step(state, action)
                 
                 rewards += reward
@@ -145,7 +146,7 @@ class DDPGModel:
             while True:
                 reward = self.network.predict_reward(np.stack([state]), omega, True).item()
                 action = self.network.predict(np.stack([state]), True).flatten()
-                action += self.random_process.sample()
+                # action += self.random_process.sample()
                 next_state, terminal = self.task.step(state, action)
                 
                 rewards += reward
@@ -170,13 +171,14 @@ class DDPGModel:
             print('qvalue iter %d episode %d total step %d avg reward %f' % (itr, q_episode, self.total_step, np.mean(np.array(self.q_episode_rewards[-100:]))))
 
         
-    def policy_evaluation(self, itr, omega, bound_r):
+    def policy_evaluation(self, itr, omega, bound_r, save_traj=False):
         # evaluation deterministic action
         print('evaluation iter from demonstration ...')
-        eval_episode_rewards = []
+        eval_traj = []
         for _ in range(self.config.e_episodes_num):
             rewards = 0.0
             state = self.task.reset()
+            eval_traj.append(state)
             steps = 0
 
             while steps < 1000:
@@ -187,12 +189,14 @@ class DDPGModel:
                 rewards += reward
                 steps += 1
                 self.task.grasp_check()
-                flag = self.task.grasp_check() if terminal else 0
+                _ = self.task.grasp_check() if terminal else 0
                 state = next_state
+                eval_traj.append(state)
                 
                 if terminal: break
 
-            
-            eval_episode_rewards.append(rewards)
+            self.eval_episode_rewards.append(rewards)
 
-        return np.mean(eval_episode_rewards)
+        if save_traj:
+            return np.mean(self.eval_episode_rewards[-100:]), np.asarray(eval_traj)
+        return np.mean(self.eval_episode_rewards[-100:])

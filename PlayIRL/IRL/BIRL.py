@@ -19,9 +19,6 @@ class BIOIRL(threading.Thread):
         if self.irl_config.b_load:
             filename = 'env_irl_model{0}.pth.tar'.format(self.irl_config.save_flag)
             self.load_checkpoint(filename)
-            # with open('env_irl_model{0}.pkl'.format(self.irl_config.save_flag), 'rb') as fi:
-            #     self.irl_config, self.policy_config, self.rl_model, self.omega, self.log_posterior = pickle.load(fi)
-                # load halfplane if hard constraint
 
 
         self.demos_D = None
@@ -32,6 +29,7 @@ class BIOIRL(threading.Thread):
 
     def save_checkpoint(self, filename):
         state = {}
+        
         state['omega'] = self.omega
         state['log_posterior'] = self.log_posterior
         state['network_dict'] = self.rl_model.network.state_dict()
@@ -43,6 +41,7 @@ class BIOIRL(threading.Thread):
         state['total_step'] = self.rl_model.total_step
         state['p_episode_rewards'] = self.rl_model.p_episode_rewards
         state['q_episode_rewards'] = self.rl_model.q_episode_rewards
+        state['eval_episode_rewards'] = self.rl_model.eval_episode_rewards
 
         torch.save(state, filename)
 
@@ -62,6 +61,7 @@ class BIOIRL(threading.Thread):
         self.rl_model.total_step = state['total_step']
         self.rl_model.p_episode_rewards = state['p_episode_rewards']
         self.rl_model.q_episode_rewards = state['q_episode_rewards']
+        self.rl_model.eval_episode_rewards = state['eval_episode_rewards']
 
 
     def copy_to_new_model(self, rl_model):
@@ -112,11 +112,6 @@ class BIOIRL(threading.Thread):
         #     if self.irl_config.evalT > 0 and irl_iter % self.irl_config.evalT == 0:
         #         filename = 'env_irl_model{0}.pth.tar'.format(self.irl_config.save_flag)
         #         self.save_checkpoint(filename)
-        #         # with open('env_irl_model{0}.pkl'.format(self.irl_config.save_flag), 'wb') as fo:
-        #         #     data = [self.irl_config, self.policy_config, self.rl_model, self.omega, self.log_posterior]
-        #         #     pickle.dump(data, fo, pickle.HIGHEST_PROTOCOL)
-        #         # fo.close()
-
 
         #         eval_reward = self.rl_model.policy_evaluation(irl_iter, self.omega, self.irl_config.bound_r)
         #         print('itr %d evaluation reward %f' % (irl_iter, eval_reward))

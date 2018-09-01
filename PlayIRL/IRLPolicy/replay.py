@@ -22,11 +22,22 @@ class Replay:
         for exp in experience:
             self.feed(exp)
 
+
     def sample(self, batch_size=None):
         if batch_size is None:
             batch_size = self.batch_size
 
         sampled_indices = [np.random.randint(0, len(self.data)) for _ in range(batch_size)]
+        sampled_data = [self.data[idx] for idx in sampled_indices]
+        batch_data = list(map(lambda x: np.asarray(x), zip(*sampled_data)))
+        return batch_data
+
+
+    def sample_segment(self, pos1, pos2):
+        if pos1 >= pos2:
+            return None
+
+        sampled_indices = range(pos1, pos2)
         sampled_data = [self.data[idx] for idx in sampled_indices]
         batch_data = list(map(lambda x: np.asarray(x), zip(*sampled_data)))
         return batch_data
