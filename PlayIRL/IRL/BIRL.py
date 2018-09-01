@@ -13,7 +13,8 @@ class BIOIRL(threading.Thread):
         self.policy_config = policy_config
 
         self.rl_model = DDPGModel(self.policy_config)
-        self.omega = np.random.uniform(-1.0, 1.0, self.irl_config.feature_dim)
+        # self.omega = np.random.uniform(-1.0, 1.0, self.irl_config.feature_dim)
+        self.omega = np.ones(self.irl_config.feature_dim)
         self.log_posterior = 0
 
         if self.irl_config.b_load:

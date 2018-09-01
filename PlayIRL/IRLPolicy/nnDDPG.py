@@ -33,7 +33,7 @@ class DDPGNet(nn.Module, BaseNet):
         self.set_gpu(gpu)
 
 
-    def feature(self, state, to_numpy=True):
+    def feature(self, state, to_numpy=False):
         state = self.tensor(state)
         phi = self.phi_body(state)
         if to_numpy:

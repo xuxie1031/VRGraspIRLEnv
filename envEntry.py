@@ -33,9 +33,6 @@ def run_playground():
     policy_config.terminal_dim = 1
     policy_config.flag_dim = 1
 
-    policy_config.target_network_mix = 1e-3
-    policy_config.min_replay_size = 10
-    policy_config.discount = .99
     policy_config.critic_dim = irl_config.feature_dim
 
     policy_config.task_fn = lambda task_name, state_dim, action_dim: VRGraspTask(

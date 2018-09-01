@@ -175,8 +175,8 @@ class DDPGModel:
         # evaluation deterministic action
         print('evaluation iter from demonstration ...')
         eval_traj = []
+        rewards = 0.0
         for _ in range(self.config.e_episodes_num):
-            rewards = 0.0
             state = self.task.reset()
             eval_traj.append(state)
             steps = 0
@@ -195,8 +195,8 @@ class DDPGModel:
                 
                 if terminal: break
 
-            self.eval_episode_rewards.append(rewards)
+        self.eval_episode_rewards.append(rewards/self.config.e_episodes_num)
 
         if save_traj:
-            return np.mean(self.eval_episode_rewards[-100:]), np.asarray(eval_traj)
-        return np.mean(self.eval_episode_rewards[-100:])
+            return self.eval_episode_rewards[-1], np.asarray(eval_traj)
+        return self.eval_episode_rewards[-1]
