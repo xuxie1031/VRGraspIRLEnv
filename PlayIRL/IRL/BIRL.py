@@ -196,10 +196,10 @@ class BIOIRL(threading.Thread):
         return mus.dot(omega)
 
 
-    def generate_halfplane_normals_pi(self, rl_model):
+    def generate_halfplane_normals_pi(self, rl_model, demos):
         # print('generating halfplane normals pi ...')
         sampled_action_num = 8
-        sampled_states = random_sample_states_around_demos(self.demos_D)
+        sampled_states = random_sample_states_around_demos(demos)
         sampled_delta_mus = []
         for i in range(len(sampled_states)):
             batch_states = np.stack([sampled_states[i, :]]).repeat(sampled_action_num, axis=0)
@@ -280,14 +280,31 @@ class BIOIRL(threading.Thread):
         # log_likelihood = self.irl_config.gamma*np.sum(qvalues)
         # log_posterior = log_likelihood
 
+        # # qvalue_D & infogap_D likelihood
+        # if halfplane_normals_demo is None:
+        #     halfplane_normals_demo = self.generate_halfplane_normals_demos(rl_model, self.demos_D)
+        # halfplane_normals_pi_demo = self.generate_halfplane_normals_pi(rl_model, self.demos_D)
+
+        # infogap_D = self.infogap_from_demos(halfplane_normals_pi_demo, halfplane_normals_demo, omega)
+        # print('data log_likelihood {0}, infogap {1}'.format(np.sum(qvalues), infogap_D))
+        # print('old log_likelihood {0}'.format(self.log_posterior))
+        # log_likelihood = self.irl_config.gamma*np.sum(qvalues)+self.irl_config.gamma_infogap*infogap_D
+        # log_posterior = log_likelihood
+
         # qvalue_D & infogap_D likelihood
         if halfplane_normals_demo is None:
             halfplane_normals_demo = self.generate_halfplane_normals_demos(rl_model, self.demos_D)
-        halfplane_normals_pi = self.generate_halfplane_normals_pi(rl_model)
-        infogap_D = self.infogap_from_demos(halfplane_normals_pi, halfplane_normals_demo, omega)
-        print('data log_likelihood {0}, infogap {1}'.format(np.sum(qvalues), infogap_D))
+        halfplane_normals_pi_demo = self.generate_halfplane_normals_pi(rl_model, self.demos_D)
+
+        halfplane_normals_fail = self.generate_halfplane_normals_demos(rl_model, self.demos_F)
+        halfplane_normals_pi_fail = self.generate_halfplane_normals_pi(rl_model, self.demos_F)
+
+        infogap_D = self.infogap_from_demos(halfplane_normals_pi_demo, halfplane_normals_demo, omega)
+        infogap_F = self.infogap_from_demos(halfplane_normals_pi_fail, halfplane_normals_fail, omega)
+
+        print('data log_likelihood {0}, infogap_D {1}, infogap_F {2}'.format(np.sum(qvalues), infogap_D, infogap_F))
         print('old log_likelihood {0}'.format(self.log_posterior))
-        log_likelihood = self.irl_config.gamma*np.sum(qvalues)+self.irl_config.gamma_infogap*infogap_D
+        log_likelihood = self.irl_config.gamma*np.sum(qvalues)+self.irl_config.gamma_infogap*abs(infogap_D-infogap_F)
         log_posterior = log_likelihood
 
         return np.maximum(log_posterior, 1e-6)

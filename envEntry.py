@@ -15,7 +15,7 @@ def run_playground():
     irl_config.batch_size_demos = 128
     irl_config.bound_r = (-1.0, 1.0)
     irl_config.gamma = 1.0
-    irl_config.gamma_infogap = 1e4
+    irl_config.gamma_infogap = 1e3
     irl_config.evalT = 1
     # irl_config.b_load = True
     irl_config.save_flag = '_BIOIRL_reward'
