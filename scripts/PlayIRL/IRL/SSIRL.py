@@ -63,7 +63,7 @@ class SSIRL(threading.Thread):
             if self.irl_config.evalT > 0 and irl_iter % self.irl_config.evalT == 0:
                 filename = 'env_irl_model{0}.pth.tar'.format(self.irl_config.save_flag)
                 self.save_checkpoint(filename)
-                eval_reward = self.rl_model.policy_evaluation(irl_iter, self.omega, self.irl_config.bound_r)
+                eval_reward = self.rl_model.policy_evaluation(irl_iter, self.irl_config.bound_r, name='linear', rname='linear_reward', omega=self.omega)
                 print('itr %d evaluation reward %f' % (irl_iter, eval_reward))
 
             

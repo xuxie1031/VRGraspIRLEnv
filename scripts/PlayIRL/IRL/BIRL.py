@@ -126,7 +126,7 @@ class BIRLF(threading.Thread):
 
 
         # with mcmc sample transition without omega constraint
-        self.rl_model.policy_iteration(0, self.omega, self.irl_config.bound_r)
+        self.rl_model.policy_iteration(0, self.irl_config.bound_r, name='linear', rname='linear_reward', omega=self.omega)
         mus_D = self.calc_mu(self.rl_model, self.demos_D, flag='demo')
         qvalues_D = self.calc_qvalue(mus_D, self.omega)
         self.log_posterior = self.calc_posterior(0, self.rl_model, self.omega, qvalues_D, None)
@@ -134,7 +134,7 @@ class BIRLF(threading.Thread):
             if self.irl_config.evalT > 0 and irl_iter % self.irl_config.evalT == 0:
                 filename = 'env_irl_model{0}.pth.tar'.format(self.irl_config.save_flag)
                 self.save_checkpoint(filename)
-                eval_reward = self.rl_model.policy_evaluation(irl_iter, self.omega, self.irl_config.bound_r)
+                eval_reward = self.rl_model.policy_evaluation(irl_iter, self.irl_config.bound_r, name='linear', rname='linear_reward', omega=self.omega)
                 print('itr %d evaluation reward %f' % (irl_iter, eval_reward))
 
             # new_rl_model = self.copy_to_new_model(self.rl_model)
@@ -151,13 +151,13 @@ class BIRLF(threading.Thread):
             new_qvalues_pi, new_qvalues_D = self.calc_qvalue(new_mus_pi, new_omega), self.calc_qvalue(new_mus_D, new_omega)
 
             if self.assert_policy_diff(new_qvalues_pi, new_qvalues_D):
-                new_rl_model.policy_iteration(irl_iter, new_omega, self.irl_config.bound_r)
+                new_rl_model.policy_iteration(irl_iter, self.irl_config.bound_r, name='linear', rname='linear_reward', omega=new_omega)
                 new_mus_D = self.calc_mu(new_rl_model, self.demos_D, flag='demo')
                 new_qvalues_D = self.calc_qvalue(new_mus_D, new_omega)
                 self.rl_model, self.omega, self.log_posterior = self.soft_transition(irl_iter, new_rl_model, new_omega, new_qvalues_D, condition=0)
             else:
                 self.rl_model, self.omega, self.log_posterior = self.soft_transition(irl_iter, new_rl_model, new_omega, new_qvalues_D, condition=1)
-            self.rl_model.policy_iteration(irl_iter, self.omega, self.irl_config.bound_r)
+            self.rl_model.policy_iteration(irl_iter, self.irl_config.bound_r, name='linear', rname='linear_reward', omega=self.omega)
             mus_D = self.calc_mu(self.rl_model, self.demos_D, flag='demo')
             qvalues_D = self.calc_qvalue(mus_D, self.omega)
             self.log_posterior = self.calc_posterior(irl_iter, self.rl_model, self.omega, qvalues_D, None)

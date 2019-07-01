@@ -1,4 +1,5 @@
 from .nnUtils import *
+from ..IRL.kernelUtils import *
 
 class DDPGNet(nn.Module, BaseNet):
     def __init__(
@@ -58,11 +59,20 @@ class DDPGNet(nn.Module, BaseNet):
         return action
 
 
-    def predict_reward(self, state, omega, to_numpy=False):
-        omega_t = self.tensor(omega).unsqueeze(-1)
+    def predict_reward(self, state, to_numpy=False, **kwargs):
         phi = self.feature(state)
-        reward = phi.mm(omega_t)
-        reward = reward.detach()
+
+        if kwargs['rname'] = 'linear_reward':
+            omega_t = self.tensor(kwargs['omega']).unsqueeze(-1)
+            reward = phi.mm(omega_t)
+
+        if kwargs['rname'] = 'gp_reward':
+            Xu_t = self.tensor(kwargs['Xu'])
+            Kuu_inv_t = self.tensor(kwargs['Kuu_inv'])
+            u_t = self.tensor(kwargs['u'])
+            reward = kernel(phi, Xu_t).mm(Kuu_inv_t).mm(u_t)
+
+        reward.detach_()
         if to_numpy:
             reward = reward.cpu().numpy()
 
