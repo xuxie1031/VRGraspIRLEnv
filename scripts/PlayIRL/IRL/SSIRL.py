@@ -63,32 +63,67 @@ class SSIRL(threading.Thread):
             if self.irl_config.evalT > 0 and irl_iter % self.irl_config.evalT == 0:
                 filename = 'env_irl_model{0}.pth.tar'.format(self.irl_config.save_flag)
                 self.save_checkpoint(filename)
-                eval_reward = self.rl_model.policy_evaluation(irl_iter, self.irl_config.bound_r, name='linear', rname='linear_reward', omega=self.omega)
+                eval_reward, eval_traj = self.rl_model.policy_evaluation(irl_iter, self.irl_config.bound_r, name='linear', rname='linear_reward', omega=self.omega)
                 print('itr %d evaluation reward %f' % (irl_iter, eval_reward))
+            
+            self.calc_omega()
+            self.rl_model.policy_iteration(irl_iter, self.irl_config.bound_r, name='linear', rname='linear_reward', omega=self.omega)
+            self.calc_mu_pi(irl_iter, eval_traj)
+
+
+    def calc_mu_pi(self, irl_iter, eval_traj):
+        mus = []
+
+        steps = 0
+        accu_phi = np.zeros(self.irl_config.feature_dim)
+        for i in len(eval_traj):
+            state, terminal = eval_traj[i]
+            phi = self.rl_model.network.feature(np.stack[state], to_numpy=True).flatten()
+            accu_phi = accu_phi+self.policy_config.discount**steps*phi
+            if terminal > 0:
+                mus.append(accu_phi)
+                steps = 0
+                accu_phi = np.zeros(self.irl_config.feature_dim)
+        mus = np.asarray(mus)
+        self.policy_mus[irl_iter, :] = np.mean(mus, axis=0)
 
             
-    def calc_mu(self, demos, flag='demo'):
-        
-
+    def calc_mu_demos(self, demos):
         mus = []
-        pos = 0
-        while pos < len(demos[0]):
-            states = demos[0][pos:(min(pos+self.irl_config.batch_size_demos, len(demos[0]))), :]
-            actions = demos[1][pos:(min(pos+self.irl_config.batch_size_demos, len(demos[1]))), :]
-            if flag == 'demo':
-                batch_mu = self.rl_model.network.predict_mu(np.stack(states), np.stack(actions), to_numpy=True)
-            elif flag == 'policy':
-                batch_mu = self.rl_model.network.predict_policy_mu(np.stack(states), to_numpy=True)
-            mus.append(batch_mu)
-            pos = min(pos+self.irl_config.batch_size_demos, len(demos[0]))
+        states = demos[0]
+        terminals = demos[3]
 
-        mus = np.concatenate(mus, axis=0)
-        return mus
+        steps = 0
+        accu_phi = np.zeros(self.irl_config.feature_dim)
+        for i in len(states):
+            state = states[i, :]
+            phi = self.rl_model.network.feature(np.stack([state]), to_numpy=True).flatten()
+            accu_phi = accu_phi+self.policy_config.discount**steps*phi
+            if terminals[i] > 0:
+                mus.append(accu_phi)
+                steps = 0
+                accu_phi = np.zeros(self.irl_config.feature_dim)
+        mus = np.asarray(mus)
+
+        return np.mean(mus, axis=0)
 
 
     def calc_omega(self):
-        mus_demos_D, mus_demos_F = self.calc_mu(self.demos_D, flag='demo'), self.calc_mu(self.demos_F, flag='demo')
+        mu_D = self.calc_mu_demos(self.demos_D)
+        mu_F = self.calc_mu_demos(self.demos_F)
 
+        dim = np.random.randint(self.irl_config.feature_dim, size=1).item()
+        min_obj = np.inf
+        arg_omega = np.zeros(self.omega.shape)
+        for e in np.linspace(-1.0, 1.0, num=100):
+            omega = np.copy(self.omega)
+            omega[dim] = e
+            obj = max(1-mu_D.dot(omega), 0.0)+self.policy_config.discount*np.linalg.norm(omega)+ \
+                np.sum(np.maximum(1+self.policy_mus.dot(omega), 0.0))+self.policy_config.discount*max(1-abs(mu_F.dot(omega)), 0)
+            if obj < min_obj:
+                min_obj = obj
+                arg_omega = omega
+        self.omega = arg_omega/np.linalg.norm(arg_omega)
 
     
     def load_demos_set(self):
