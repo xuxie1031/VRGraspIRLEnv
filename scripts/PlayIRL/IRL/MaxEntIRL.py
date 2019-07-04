@@ -67,7 +67,7 @@ class MaxEntIRL(threading.Thread):
                 eval_reward = self.rl_model.policy_evaluation(irl_iter, self.irl_config.bound_r, name='linear', rname='linear_reward', omega=self.omega)
                 print('itr %d evaluation reward %f' % (irl_iter, eval_reward))
 
-            self.rl_model.policy_iteration(0, self.irl_config.bound_r, name='linear', rname='linear_reward', omega=self.omega)
+            self.rl_model.policy_iteration(irl_iter, self.irl_config.bound_r, name='linear', rname='linear_reward', omega=self.omega)
             self.omega += self.irl_config.maxent_lr*self.calc_maxent_gradient()
 
 

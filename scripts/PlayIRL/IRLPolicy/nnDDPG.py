@@ -70,7 +70,7 @@ class DDPGNet(nn.Module, BaseNet):
             Xu_t = self.tensor(kwargs['Xu'])
             Kuu_inv_t = self.tensor(kwargs['Kuu_inv'])
             u_t = self.tensor(kwargs['u'])
-            reward = kernel(phi, Xu_t).mm(Kuu_inv_t).mm(u_t)
+            reward = kernel_tensor(phi, Xu_t, lambd=kwargs['lambd'], beta=kwargs['beta'], device=kwargs['device']).mm(Kuu_inv_t).mm(u_t)
 
         reward.detach_()
         if to_numpy:

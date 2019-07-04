@@ -73,11 +73,11 @@ class DDPGModel:
             policy_loss = -self.network.critic(phi.detach(), action).mm(omega_t.unsqueeze(-1)).mean()
 
         if kwargs['name'] == 'gp':
-            Xu_t = self.tensor(kwargs['Xu'])
-            Kuu_inv_t = self.tensor(kwargs['Kuu_inv'])
-            u_t = self.tensor(kwargs['u'])
+            Xu_t = self.network.tensor(kwargs['Xu'])
+            Kuu_inv_t = self.network.tensor(kwargs['Kuu_inv'])
+            u_t = self.network.tensor(kwargs['u'])
             Xu_t.requires_grad, Kuu_inv_t.requires_grad, u_t.requires_grad = False, False, False
-            kernel_critic = kernel(self.network.critic(phi.detach(), action), kwargs['Xu'], lambd=kwargs['lambd'], beta=kwargs['beta']).mm(kwargs['Kuu_inv']).mm(kwargs['u'])
+            kernel_critic = kernel_tensor(self.network.critic(phi.detach(), action), Xu_t, lambd=kwargs['lambd'], beta=kwargs['beta'], device=kwargs['device']).mm(Kuu_inv_t).mm(u_t)
             policy_loss = -self.network.tensor(kernel_critic)
 
         self.network.zero_grad()
