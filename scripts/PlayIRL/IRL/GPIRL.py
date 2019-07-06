@@ -30,7 +30,7 @@ class GPIRL(threading.Thread):
         self.build_state_action_dict_demos()
 
         self.u = np.ones((len(self.demos[0]), 1))
-        self.sigma_sq = 0.5e-2
+        self.sigma_sq = self.irl_config.sigma_sq
         self.beta = 0.5
         self.lambd = np.ones((self.irl_config.feature_dim, 1))
         self.Kuu_inv = None
@@ -81,20 +81,20 @@ class GPIRL(threading.Thread):
                 eval_reward = self.rl_model.policy_evaluation(irl_iter, self.irl_config.bound_r, name='gp', rname='gp_reward', Xu=self.Xu, Kuu_inv=self.Kuu_inv, u=self.u, lambd=self.lambd, beta=self.beta, device=self.rl_model.network.device)
                 print('iter %d evaluation reward %f' % (irl_iter, eval_reward))
             
-            n, m = Xu.shape[0], Xu.shape[1]
-            Kuu = kernel(Xu, Xu, lambd=self.lambd, beta=self.beta)
+            n, m = self.Xu.shape[0], self.Xu.shape[1]
+            Kuu = kernel(self.Xu, self.Xu, lambd=self.lambd, beta=self.beta)
             self.Kuu_inv = np.linalg.inv(Kuu)
             self.rl_model.policy_iteration(irl_iter, self.irl_config.bound_r, name='gp', rname='gp_reward', Xu=self.Xu, Kuu_inv=self.Kuu_inv, u=self.u, lambd=self.lambd, beta=self.beta, device=self.rl_model.network.device)
 
-            build_state_action_dict_policy()
+            self.build_state_action_dict_policy()
             grad_u_LG = -self.Kuu_inv.dot(self.u).T
             grad_r_LD = np.array([[]])
-            grad_u_r = np.empty(u.shape)
+            grad_u_r = np.empty(self.u.shape)
             grad_theta_r = []
-            coeffs_uu = grad_lambda_K_coeffs(Xu, Xu, self.sigma_sq)
+            coeffs_uu = grad_lambda_K_coeffs(self.Xu, self.Xu, self.sigma_sq)
             coeffs_uu.append(1./self.beta)
             grad_theta_Kuu = []
-            alpha = self.Kuu_inv*u
+            alpha = self.Kuu_inv*self.u
             grad_theta_LG = np.array([])
             grad_theta_LH = np.array([])
 
@@ -102,7 +102,7 @@ class GPIRL(threading.Thread):
                 grad_theta_Kuu.append(np.multiply(coeffs_uu[i], Kuu))
                 grad_theta_LG = np.append(grad_theta_LG, 0.5*np.trace(alpha.dot(alpha.T)-self.Kuu_inv).dot(grad_theta_Kuu[-1]))
                 grad_H = np.trace(self.Kuu_inv.dot(self.Kuu_inv).dot(self.Kuu_inv).dot(grad_theta_Kuu[-1]))
-                if i != len(coeffs_uu)-1: grad_H -= 1./(1+sum(lambd))
+                if i != len(coeffs_uu)-1: grad_H -= 1./(1+sum(self.lambd))
                 grad_theta_LH = np.append(grad_theta_LH, grad_H)
             
             pts = list(self.demos_savf.keys())
@@ -113,12 +113,12 @@ class GPIRL(threading.Thread):
             for pt in pts:
                 state = np.asarray(pt[0])
                 feature = self.rl_model.network.feature(np.stack([state]), to_numpy=True)
-                K_r_u = kernel(feature, Xu, lambd=self.lambd, beta=self.beta)
-                coeffs_ru = grad_lambda_K_coeffs(feature, Xu)
+                K_r_u = kernel(feature, self.Xu, lambd=self.lambd, beta=self.beta)
+                coeffs_ru = grad_lambda_K_coeffs(feature, self.Xu, self.sigma_sq)
                 coeffs_ru.append(1./self.beta)
                 drdu_vec = []
                 for i in range(len(coeffs_ru)):
-                    drdu_vec.append((np.multiply(coeffs_ru[i], K_r_u)-K_r_u.dot(self.Kuu_inv).dot(grad_theta_Kuu[i])).dot(self.Kuu_inv).dot(u)[0][0])
+                    drdu_vec.append((np.multiply(coeffs_ru[i], K_r_u)-K_r_u.dot(self.Kuu_inv).dot(grad_theta_Kuu[i])).dot(self.Kuu_inv).dot(self.u)[0][0])
                 grad_r_LD = np.append(grad_r_LD, [[self.demos_savf[pt]-self.policy_savf[pt]]], axis=1)
                 grad_u_r = np.append(grad_u_r, K_r_u.dot(self.Kuu_inv), axis=0)
                 grad_theta_r.append(drdu_vec)

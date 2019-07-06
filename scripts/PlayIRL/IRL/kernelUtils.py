@@ -4,11 +4,11 @@ import numpy as np
 def kernel_calc(xi, xj, k_name='RBF', **kwargs):
     assert len(xi) == len(xj)
 
-    if name == 'RBF':
+    if k_name == 'RBF':
         s = np.sum((xi-xj)**2)
         return kwargs['sigma_f']**2*np.exp(-1. / (2*kwargs['l']**2)*s)+kwargs['sigma_n']**2*(not kwargs['i_neq_j'])
     
-    if name == 'ARD':
+    if k_name == 'ARD':
         assert len(xi) == len(kwargs['lambd'])
         trace = sum(kwargs['lambd'])
         s = np.sum(kwargs['lambd']*(xi-xj)**2+2*kwargs['i_neq_j']*kwargs['sigma_sq']*trace)
@@ -18,11 +18,11 @@ def kernel_calc(xi, xj, k_name='RBF', **kwargs):
 def kernel_calc_tensor(xi, xj, k_name='RBF', **kwargs):
     assert len(xi) == len(xj)
 
-    if name == 'RBF':
+    if k_name == 'RBF':
         s = torch.sum((xi-xj)**2)
         return kwargs['sigma_f']**2*torch.exp(-1. / (2*kwargs['l']**2)*s)+kwargs['sigma_n']**2*(not kwargs['i_neq_j'])
     
-    if name == 'ARD':
+    if k_name == 'ARD':
         assert len(xi) == len(kwargs['lambd'])
         trace = sum(kwargs['lambd'])
         s = torch.sum(kwargs['lambd']*(xi-xj)**2+2*kwargs['i_neq_j']*kwargs['sigma_sq']*trace)
@@ -55,7 +55,7 @@ def kernel_tensor(x1, x2, **kwargs):
     return K
 
 
-def grad_lambda_K_coeffs(self, x1, x2, sigma_sq):
+def grad_lambda_K_coeffs(x1, x2, sigma_sq):
     is_not_diagnol = len(x1) != len(x2)
     m = x1.shape[1]
     coeff_matrice = []

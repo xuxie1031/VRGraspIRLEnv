@@ -32,7 +32,7 @@ class DDPGModel:
     
 
     def critic_training(self, states, actions, next_states, terminals, flags, bound_r, **kwargs):
-        omega_t = self.network.tensor(omega)
+        omega_t = self.network.tensor(kwargs['omega'])
         omega_t.requires_grad = False
         
         phi_next = self.target_network.feature(next_states)
@@ -68,7 +68,7 @@ class DDPGModel:
         action = self.network.actor(phi)
 
         if kwargs['name'] == 'linear':
-            ometa_t = self.network.tensor(kwargs['omega'])
+            omega_t = self.network.tensor(kwargs['omega'])
             omega_t.requires_grad = False
             policy_loss = -self.network.critic(phi.detach(), action).mm(omega_t.unsqueeze(-1)).mean()
 

@@ -39,3 +39,5 @@ class IRLConfig:
         self.b_load = False
 
         self.maxent_lr = 1e-2
+        self.gp_lr = 1e-2
+        self.sigma_sq = 1e-5
