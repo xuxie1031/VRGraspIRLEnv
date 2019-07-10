@@ -95,7 +95,7 @@ class SSIRL(threading.Thread):
 
         steps = 0
         accu_phi = np.zeros(self.irl_config.feature_dim)
-        for i in len(states):
+        for i in range(len(states)):
             state = states[i, :]
             phi = self.rl_model.network.feature(np.stack([state]), to_numpy=True).flatten()
             accu_phi = accu_phi+self.policy_config.discount**steps*phi
@@ -128,7 +128,7 @@ class SSIRL(threading.Thread):
     
     def load_demos_set(self):
         print('load demos set ...')
-        base_path = 'src/PlayIRL'
+        base_path = 'scripts/PlayIRL'
         demos_path = os.path.join(base_path,'DemosData')
         demos_seg = [self.policy_config.state_dim, self.policy_config.action_dim, self.policy_config.state_dim, self.policy_config.terminal_dim, self.policy_config.flag_dim]
         self.demos_D = np.genfromtxt(os.path.join(demos_path, 'demos_D.csv'), delimiter=',')

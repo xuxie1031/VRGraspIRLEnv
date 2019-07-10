@@ -32,13 +32,27 @@ class DDPGModel:
     
 
     def critic_training(self, states, actions, next_states, terminals, flags, bound_r, **kwargs):
-        omega_t = self.network.tensor(kwargs['omega'])
-        omega_t.requires_grad = False
-        
         phi_next = self.target_network.feature(next_states)
         a_next = self.target_network.actor(phi_next)
         mu_next = self.target_network.critic(phi_next, a_next)
-        q_next = mu_next.mm(omega_t.unsqueeze(-1))
+
+        phi = self.network.feature(states)
+        mu = self.network.critic(phi, self.network.tensor(actions))
+
+        if kwargs['name'] == 'linear':
+            omega_t = self.network.tensor(kwargs['omega'])
+            omega_t.requires_grad = False
+            q_next = mu_next.mm(omega_t.unsqueeze(-1))
+            q = mu.mm(omega_t.unsqueeze(-1))
+
+        if kwargs['name'] == 'gp':
+            Xu_t = self.network.tensor(kwargs['Xu'])
+            Kuu_inv_t = self.network.tensor(kwargs['Kuu_inv'])
+            u_t = self.network.tensor(kwargs['u'])
+            Xu_t.requires_grad, Kuu_inv_t.requires_grad, u_t.requires_grad = False, False, False
+            q_next = kernel_tensor(mu_next, Xu_t, lambd=kwargs['lambd'], beta=kwargs['beta'], sigma_sq=kwargs['sigma_sq'], device=kwargs['device']).mm(Kuu_inv_t).mm(u_t)
+            q = kernel_tensor(mu, Xu_t, lambd=kwargs['lambd'], beta=kwargs['beta'], sigma_sq=kwargs['sigma_sq'], device=kwargs['device']).mm(Kuu_inv_t).mm(u_t)
+
         rewards = self.network.predict_reward(states, **kwargs)
         rewards = torch.clamp(rewards, bound_r[0], bound_r[1])
 
@@ -53,9 +67,6 @@ class DDPGModel:
         q_next.add_(rewards)
         q_next = q_next.detach()
 
-        phi = self.network.feature(states)
-        mu = self.network.critic(phi, self.network.tensor(actions))
-        q = mu.mm(omega_t.unsqueeze(-1))
         critic_loss = (q - q_next).pow(2).mul(0.5).sum(-1).mean()
 
         self.network.zero_grad()
@@ -77,8 +88,8 @@ class DDPGModel:
             Kuu_inv_t = self.network.tensor(kwargs['Kuu_inv'])
             u_t = self.network.tensor(kwargs['u'])
             Xu_t.requires_grad, Kuu_inv_t.requires_grad, u_t.requires_grad = False, False, False
-            kernel_critic = kernel_tensor(self.network.critic(phi.detach(), action), Xu_t, lambd=kwargs['lambd'], beta=kwargs['beta'], device=kwargs['device']).mm(Kuu_inv_t).mm(u_t)
-            policy_loss = -self.network.tensor(kernel_critic)
+            kernel_critic = kernel_tensor(self.network.critic(phi.detach(), action), Xu_t, lambd=kwargs['lambd'], beta=kwargs['beta'], sigma_sq=kwargs['sigma_sq'], device=kwargs['device']).mm(Kuu_inv_t).mm(u_t)
+            policy_loss = -kernel_critic.mean()
 
         self.network.zero_grad()
         policy_loss.backward()
@@ -89,7 +100,7 @@ class DDPGModel:
         # play through demonstration D
         print('policy iter from demonstration ...')
         self.target_copy(self.target_network, self.network)
-        for _ in range(self.config.D_p_episodes_num):
+        for p_episode in range(self.config.D_p_episodes_num):
             if self.replay_D.size() >= self.config.min_replay_size:
                 experiences = self.replay_D.sample()
                 states, actions, next_states, terminals, flags = experiences
@@ -101,6 +112,7 @@ class DDPGModel:
 
         # play through replay samples M
         # self.replay_M.reset()
+        print('policy iter from experience ...')
         for p_episode in range(self.config.p_episodes_num):
             rewards = 0.0
             self.random_process.reset_states()
@@ -109,7 +121,7 @@ class DDPGModel:
             while True:
                 reward = self.network.predict_reward(np.stack([state]), True, **kwargs).item()
                 action = self.network.predict(np.stack([state]), True).flatten()
-                # action += self.random_process.sample()
+                action += self.random_process.sample()
                 next_state, terminal, flag = self.task.step(state, action)
                 
                 rewards += reward

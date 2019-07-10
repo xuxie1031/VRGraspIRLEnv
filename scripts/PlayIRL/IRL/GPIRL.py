@@ -9,6 +9,7 @@ from .kernelUtils import *
 
 class GPIRL(threading.Thread):
     def __init__(self, irl_config, policy_config):
+        threading.Thread.__init__(self)
         self.irl_config = irl_config
         self.policy_config = policy_config
 
@@ -34,8 +35,7 @@ class GPIRL(threading.Thread):
         self.beta = 0.5
         self.lambd = np.ones((self.irl_config.feature_dim, 1))
         self.Kuu_inv = None
-
-        self.Xu = self.calc_Xu()
+        self.Xu = None
 
 
     def save_checkpoint(self, filename):
@@ -78,18 +78,26 @@ class GPIRL(threading.Thread):
             if irl_iter > 0 and self.irl_config.evalT > 0 and irl_iter % self.irl_config.evalT == 0:
                 filename = 'env_irl_model{0}.pth.tar'.format(self.irl_config.save_flag)
                 self.save_checkpoint(filename)
-                eval_reward = self.rl_model.policy_evaluation(irl_iter, self.irl_config.bound_r, name='gp', rname='gp_reward', Xu=self.Xu, Kuu_inv=self.Kuu_inv, u=self.u, lambd=self.lambd, beta=self.beta, device=self.rl_model.network.device)
+                eval_reward = self.rl_model.policy_evaluation(irl_iter, self.irl_config.bound_r, name='gp', rname='gp_reward', Xu=self.Xu, Kuu_inv=self.Kuu_inv, u=self.u, lambd=self.lambd, beta=self.beta, sigma_sq=self.sigma_sq, device=self.rl_model.network.device)
                 print('iter %d evaluation reward %f' % (irl_iter, eval_reward))
-            
+
+            self.Xu = self.calc_Xu()                        
             n, m = self.Xu.shape[0], self.Xu.shape[1]
-            Kuu = kernel(self.Xu, self.Xu, lambd=self.lambd, beta=self.beta)
+            Kuu = kernel(self.Xu, self.Xu, lambd=self.lambd, beta=self.beta, sigma_sq=self.sigma_sq)
             self.Kuu_inv = np.linalg.inv(Kuu)
-            self.rl_model.policy_iteration(irl_iter, self.irl_config.bound_r, name='gp', rname='gp_reward', Xu=self.Xu, Kuu_inv=self.Kuu_inv, u=self.u, lambd=self.lambd, beta=self.beta, device=self.rl_model.network.device)
+
+            print('variables iter %d' % irl_iter)
+            print(self.Xu)
+            print(self.Kuu_inv)
+            print(self.u)
+            print(self.lambd)
+            print(self.beta)
+            self.rl_model.policy_iteration(irl_iter, self.irl_config.bound_r, name='gp', rname='gp_reward', Xu=self.Xu, Kuu_inv=self.Kuu_inv, u=self.u, lambd=self.lambd, beta=self.beta, sigma_sq=self.sigma_sq, device=self.rl_model.network.device)
 
             self.build_state_action_dict_policy()
             grad_u_LG = -self.Kuu_inv.dot(self.u).T
             grad_r_LD = np.array([[]])
-            grad_u_r = np.empty(self.u.shape)
+            grad_u_r = np.empty(shape=(0, len(self.demos[0])))
             grad_theta_r = []
             coeffs_uu = grad_lambda_K_coeffs(self.Xu, self.Xu, self.sigma_sq)
             coeffs_uu.append(1./self.beta)
@@ -100,7 +108,7 @@ class GPIRL(threading.Thread):
 
             for i in range(len(coeffs_uu)):
                 grad_theta_Kuu.append(np.multiply(coeffs_uu[i], Kuu))
-                grad_theta_LG = np.append(grad_theta_LG, 0.5*np.trace(alpha.dot(alpha.T)-self.Kuu_inv).dot(grad_theta_Kuu[-1]))
+                grad_theta_LG = np.append(grad_theta_LG, 0.5*np.trace(np.dot(alpha.dot(alpha.T)-self.Kuu_inv, grad_theta_Kuu[-1])))
                 grad_H = np.trace(self.Kuu_inv.dot(self.Kuu_inv).dot(self.Kuu_inv).dot(grad_theta_Kuu[-1]))
                 if i != len(coeffs_uu)-1: grad_H -= 1./(1+sum(self.lambd))
                 grad_theta_LH = np.append(grad_theta_LH, grad_H)
@@ -113,7 +121,7 @@ class GPIRL(threading.Thread):
             for pt in pts:
                 state = np.asarray(pt[0])
                 feature = self.rl_model.network.feature(np.stack([state]), to_numpy=True)
-                K_r_u = kernel(feature, self.Xu, lambd=self.lambd, beta=self.beta)
+                K_r_u = kernel(feature, self.Xu, lambd=self.lambd, beta=self.beta, sigma_sq=self.sigma_sq)
                 coeffs_ru = grad_lambda_K_coeffs(feature, self.Xu, self.sigma_sq)
                 coeffs_ru.append(1./self.beta)
                 drdu_vec = []
@@ -125,10 +133,10 @@ class GPIRL(threading.Thread):
             
             grad_theta_r = np.array(grad_theta_r)
             grad_u_obj = grad_r_LD.dot(grad_u_r)+grad_u_LG
-            grad_theta_obj = grad_r_LD.dot(grad_theta_r)+grad_theta_LG+grad_theta_LH
+            grad_theta_obj = grad_r_LD.dot(grad_theta_r)+grad_theta_LG.reshape(1, -1)+grad_theta_LH.reshape(1, -1)
 
             self.u += self.irl_config.gp_lr*grad_u_obj.T
-            self.lambd += self.irl_config.gp_lr*grad_theta_obj[0, :-1].T
+            self.lambd += self.irl_config.gp_lr*grad_theta_obj.T[:-1]
             self.beta += self.irl_config.gp_lr*grad_theta_obj[0, -1]
             
             
@@ -138,7 +146,7 @@ class GPIRL(threading.Thread):
         pos = 0
         while pos < len(demo_states):
             states = demo_states[pos:(min(pos+self.irl_config.batch_size_demos, len(demo_states)))]
-            batch_phi = self.rl_model.network.feature(np.stack([states]), to_numpy=True)
+            batch_phi = self.rl_model.network.feature(np.stack(states), to_numpy=True)
             Xu.append(batch_phi)
             pos = min(pos+self.irl_config.batch_size_demos, len(demo_states))
         Xu = np.concatenate(Xu, axis=0)
@@ -146,6 +154,7 @@ class GPIRL(threading.Thread):
 
 
     def build_state_action_dict_demos(self):
+        print('build savf demos ...')
         sa_demos = {}
         demo_states = self.demos[0]
         demo_actions = self.demos[1]
@@ -157,16 +166,18 @@ class GPIRL(threading.Thread):
 
 
     def build_state_action_dict_policy(self):
+        print('build savf policy ...')
+        sample_size = self.rl_model.replay_M.size()/10
         sa_policy = {}
-        for i in range(self.rl_model.replay_M.size()):
-            experiences = self.rl_model.replay_M.sample_segment(i, i+1)
-            states, actions, _, _, _ = experiences
-            policy_pt = (tuple(states[0]), tuple(actions[0]))
+        experiences = self.rl_model.replay_M.sample(batch_size=sample_size)
+        states, actions, _, _, _ = experiences
+        for i in range(len(states)):
+            policy_pt = (tuple(states[i]), tuple(actions[i]))
             flag, demo_pt = self.state_action_policy_in_demos(policy_pt)
             if flag:
                 if demo_pt not in sa_policy.keys(): sa_policy[demo_pt] = 0
-                sa_policy[demo_pt] += 1.0/self.rl_model.replay_M.size()
-            else: sa_policy[policy_pt] = 1.0/self.rl_model.replay_M.size()
+                sa_policy[demo_pt] += 1.0/sample_size
+            else: sa_policy[policy_pt] = 1.0/sample_size
         self.policy_savf = defaultdict(lambda:0, sa_policy)
 
 

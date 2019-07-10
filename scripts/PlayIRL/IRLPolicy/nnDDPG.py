@@ -62,15 +62,15 @@ class DDPGNet(nn.Module, BaseNet):
     def predict_reward(self, state, to_numpy=False, **kwargs):
         phi = self.feature(state)
 
-        if kwargs['rname'] = 'linear_reward':
+        if kwargs['rname'] == 'linear_reward':
             omega_t = self.tensor(kwargs['omega']).unsqueeze(-1)
             reward = phi.mm(omega_t)
 
-        if kwargs['rname'] = 'gp_reward':
+        if kwargs['rname'] == 'gp_reward':
             Xu_t = self.tensor(kwargs['Xu'])
             Kuu_inv_t = self.tensor(kwargs['Kuu_inv'])
             u_t = self.tensor(kwargs['u'])
-            reward = kernel_tensor(phi, Xu_t, lambd=kwargs['lambd'], beta=kwargs['beta'], device=kwargs['device']).mm(Kuu_inv_t).mm(u_t)
+            reward = kernel_tensor(phi, Xu_t, lambd=kwargs['lambd'], beta=kwargs['beta'], sigma_sq=kwargs['sigma_sq'], device=kwargs['device']).mm(Kuu_inv_t).mm(u_t)
 
         reward.detach_()
         if to_numpy:

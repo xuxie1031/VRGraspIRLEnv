@@ -4,6 +4,10 @@ import rospy
 import torch
 import argparse
 
+import os
+import sys
+sys.path.append(os.path.join(os.getcwd()))
+
 from PlayIRL import *
 
 def run_playground():
@@ -52,7 +56,7 @@ def run_playground():
     ''' GPIRL Setup '''
     if args.irl_name == 'GPIRL':
         irl_config = IRLConfig()
-        irl_config.sigma_sq = 1e-5
+        irl_config.sigma_sq = 1e-3
         irl_config.gp_lr = 1e-2
         irl_config.feature_dim = 64
         irl_config.episodes_num = 10000
@@ -65,6 +69,12 @@ def run_playground():
 
     ''' Policy Config '''
     policy_config = PolicyConfig()
+    policy_config.D_p_episodes_num = 20
+    policy_config.D_q_episodes_num = 10
+    policy_config.p_episodes_num = 50
+    policy_config.q_episodes_num = 20
+    policy_config.e_episodes_num = 3
+
     policy_config.task_name = 'VRGrasp'
     policy_config.state_dim = 9
     policy_config.action_dim = 4
@@ -98,6 +108,8 @@ def run_playground():
         irl_thread = MaxEntIRL(irl_config, policy_config)
     if args.irl_name == 'SSIRL':
         irl_thread = SSIRL(irl_config, policy_config)
+    if args.irl_name == 'GPIRL':
+        irl_thread = GPIRL(irl_config, policy_config)
         
     irl_thread.daemon = True
     irl_thread.start()
