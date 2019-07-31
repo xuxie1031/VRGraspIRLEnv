@@ -56,8 +56,8 @@ def run_playground():
     ''' GPIRL Setup '''
     if args.irl_name == 'GPIRL':
         irl_config = IRLConfig()
-        irl_config.sigma_sq = 1e-3
-        irl_config.gp_lr = 1e-2
+        irl_config.sigma_sq = 1e-4
+        irl_config.gp_lr = 1e-3
         irl_config.feature_dim = 64
         irl_config.episodes_num = 10000
         irl_config.batch_size_demos = 128
@@ -69,11 +69,11 @@ def run_playground():
 
     ''' Policy Config '''
     policy_config = PolicyConfig()
-    policy_config.D_p_episodes_num = 20
-    policy_config.D_q_episodes_num = 10
-    policy_config.p_episodes_num = 50
+    policy_config.D_p_episodes_num = 1#5
+    policy_config.D_q_episodes_num = 5
+    policy_config.p_episodes_num = 20#50
     policy_config.q_episodes_num = 20
-    policy_config.e_episodes_num = 3
+    policy_config.e_episodes_num = 1#3
 
     policy_config.task_name = 'VRGrasp'
     policy_config.state_dim = 9

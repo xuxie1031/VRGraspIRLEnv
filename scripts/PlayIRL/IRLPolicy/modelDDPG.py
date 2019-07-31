@@ -61,7 +61,8 @@ class DDPGModel:
 
         rewards[(flags == 2.0).nonzero()] = 100.0
         rewards[(flags == 1.0).nonzero()] = 10.0
-        rewards[(flags < 0.0).nonzero()] = bound_r[0]
+        # rewards[(flags < 0.0).nonzero()] = bound_r[0]
+        rewards[(flags < 0.0).nonzero()] = -10.0
 
         q_next = self.config.discount * q_next * (1 - terminals)
         q_next.add_(rewards)
@@ -206,10 +207,12 @@ class DDPGModel:
         # evaluation deterministic action
         print('evaluation iter from demonstration ...')
         eval_traj = []
+        terminals = []
         rewards = 0.0
         for _ in range(self.config.e_episodes_num):
             state = self.task.reset()
             eval_traj.append(state)
+            terminals.append(0)
             steps = 0
 
             while steps < 1000:
@@ -223,11 +226,12 @@ class DDPGModel:
                 _ = self.task.grasp_check() if terminal else flag
                 state = next_state
                 eval_traj.append(state)
+                terminals.append(terminal)
                 
                 if terminal: break
 
         self.eval_episode_rewards.append(rewards/self.config.e_episodes_num)
 
         if save_traj:
-            return self.eval_episode_rewards[-1], np.asarray(eval_traj)
+            return self.eval_episode_rewards[-1], np.asarray(eval_traj), np.asarray(terminals)
         return self.eval_episode_rewards[-1]

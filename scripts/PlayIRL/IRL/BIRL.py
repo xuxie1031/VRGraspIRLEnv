@@ -326,6 +326,9 @@ class BIRLF(threading.Thread):
         gap_scale = self.init_gap_scale-float(itr)/self.annel_itrs*(self.init_gap_scale-1.0)
         gap_scale = max(gap_scale, 1.0)
 
+	# no annel scheme
+        # gap_scale = 1.0
+
         # log_likelihood = self.irl_config.gamma*np.sum(qvalues)+self.irl_config.gamma_infogap*abs(infogap_D-infogap_F)
 
         log_likelihood = self.irl_config.gamma*np.sum(qvalues)+ \

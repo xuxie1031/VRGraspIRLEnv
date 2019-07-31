@@ -15,12 +15,17 @@ class GPIRL(threading.Thread):
 
         self.rl_model = DDPGModel(self.policy_config)
 
-        if self.irl_config.b_load:
-            filename = 'env_irl_model{0}.pth.tar'.format(self.irl_config.save_flag)
-            self.load_checkpoint(filename)
+        self.sigma_sq = self.irl_config.sigma_sq
+        self.beta = 0.5
+        self.lambd = np.ones((self.irl_config.feature_dim, 1))
         
         self.demos = None
         self.load_demos_set()
+        self.u = np.ones((len(self.demos[0]), 1))
+
+        if self.irl_config.b_load:
+            filename = 'env_irl_model{0}.pth.tar'.format(self.irl_config.save_flag)
+            self.load_checkpoint(filename)
 
         self.state_th_ubound = 0.0
         self.action_th_lbound = 0.0
@@ -30,10 +35,6 @@ class GPIRL(threading.Thread):
         self.demos_savf = defaultdict(lambda:0, {})
         self.build_state_action_dict_demos()
 
-        self.u = np.ones((len(self.demos[0]), 1))
-        self.sigma_sq = self.irl_config.sigma_sq
-        self.beta = 0.5
-        self.lambd = np.ones((self.irl_config.feature_dim, 1))
         self.Kuu_inv = None
         self.Xu = None
 
@@ -52,6 +53,9 @@ class GPIRL(threading.Thread):
         state['p_episode_rewards'] = self.rl_model.p_episode_rewards
         state['q_episode_rewards'] = self.rl_model.q_episode_rewards
         state['eval_episode_rewards'] = self.rl_model.eval_episode_rewards
+        state['u'] = self.u
+        state['lambd'] = self.lambd
+        state['beta'] = self.beta
 
         torch.save(state, filename)
 
@@ -71,6 +75,9 @@ class GPIRL(threading.Thread):
         self.rl_model.p_episode_rewards = state['p_episode_rewards']
         self.rl_model.q_episode_rewards = state['q_episode_rewards']
         self.rl_model.eval_episode_rewards = state['eval_episode_rewards']
+        self.u = state['u']
+        self.lambd = state['lambd']
+        self.beta = state['beta']
 
 
     def run(self):
@@ -99,6 +106,7 @@ class GPIRL(threading.Thread):
             grad_r_LD = np.array([[]])
             grad_u_r = np.empty(shape=(0, len(self.demos[0])))
             grad_theta_r = []
+            print('get coeffs ...')
             coeffs_uu = grad_lambda_K_coeffs(self.Xu, self.Xu, self.sigma_sq)
             coeffs_uu.append(1./self.beta)
             grad_theta_Kuu = []
@@ -113,25 +121,32 @@ class GPIRL(threading.Thread):
                 if i != len(coeffs_uu)-1: grad_H -= 1./(1+sum(self.lambd))
                 grad_theta_LH = np.append(grad_theta_LH, grad_H)
             
-            pts = list(self.demos_savf.keys())
+            print('rest of updates ...')
+            state_pts = [pt[0] for pt in self.demos_savf.keys()]
+            action_pts = [pt[1] for pt in self.demos_savf.keys()]
             for pt in self.policy_savf.keys():
                 if pt not in self.demos_savf.keys():
-                    pts.append(pt)
+                    state_pts.append(pt[0])
+                    action_pts.append(pt[1])
 
-            for pt in pts:
-                state = np.asarray(pt[0])
-                feature = self.rl_model.network.feature(np.stack([state]), to_numpy=True)
-                K_r_u = kernel(feature, self.Xu, lambd=self.lambd, beta=self.beta, sigma_sq=self.sigma_sq)
-                coeffs_ru = grad_lambda_K_coeffs(feature, self.Xu, self.sigma_sq)
+            pos = 0
+            while pos < len(state_pts):
+                states = np.asarray(state_pts[pos:min(pos+self.irl_config.batch_size_demos, len(state_pts))])
+                features = self.rl_model.network.feature(states, to_numpy=True)
+                K_r_u = kernel(features, self.Xu, lambd=self.lambd, beta=self.beta, sigma_sq=self.sigma_sq)
+                coeffs_ru = grad_lambda_K_coeffs(features, self.Xu, self.sigma_sq)
                 coeffs_ru.append(1./self.beta)
                 drdu_vec = []
                 for i in range(len(coeffs_ru)):
-                    drdu_vec.append((np.multiply(coeffs_ru[i], K_r_u)-K_r_u.dot(self.Kuu_inv).dot(grad_theta_Kuu[i])).dot(self.Kuu_inv).dot(self.u)[0][0])
-                grad_r_LD = np.append(grad_r_LD, [[self.demos_savf[pt]-self.policy_savf[pt]]], axis=1)
+                    drdu_vec.append((np.multiply(coeffs_ru[i], K_r_u)-K_r_u.dot(self.Kuu_inv).dot(grad_theta_Kuu[i])).dot(self.Kuu_inv).dot(self.u)[:, 0])
+                demo_savfs = np.asarray([self.demos_savf[(state_pts[i], action_pts[i])] for i in range(pos, min(pos+self.irl_config.batch_size_demos, len(state_pts)))])
+                policy_savfs = np.asarray([self.policy_savf[(state_pts[i], action_pts[i])] for i in range(pos, min(pos+self.irl_config.batch_size_demos, len(state_pts)))])    
+                grad_r_LD = np.append(grad_r_LD, [(demo_savfs-policy_savfs).tolist()], axis=1)
                 grad_u_r = np.append(grad_u_r, K_r_u.dot(self.Kuu_inv), axis=0)
-                grad_theta_r.append(drdu_vec)
+                grad_theta_r.append(np.array(drdu_vec).T)
+                pos = min(pos+self.irl_config.batch_size_demos, len(state_pts))
             
-            grad_theta_r = np.array(grad_theta_r)
+            grad_theta_r = np.concatenate(grad_theta_r, axis=0)
             grad_u_obj = grad_r_LD.dot(grad_u_r)+grad_u_LG
             grad_theta_obj = grad_r_LD.dot(grad_theta_r)+grad_theta_LG.reshape(1, -1)+grad_theta_LH.reshape(1, -1)
 
@@ -167,6 +182,7 @@ class GPIRL(threading.Thread):
 
     def build_state_action_dict_policy(self):
         print('build savf policy ...')
+        # sample_size = min(100000, self.rl_model.replay_M.size())
         sample_size = self.rl_model.replay_M.size()/10
         sa_policy = {}
         experiences = self.rl_model.replay_M.sample(batch_size=sample_size)

@@ -154,7 +154,7 @@ unsigned int DataReceiver::MessagePublishTrain(const unsigned char* Data)
 
 void DataReceiver::BufferedRecv()
 {
-    listen(socket_desc, 0);
+    listen(socket_desc, 3);
     int len_addrin = sizeof(struct sockaddr_in);
 
     client_sock = accept(socket_desc, (struct sockaddr*)&client, (socklen_t*)&len_addrin);

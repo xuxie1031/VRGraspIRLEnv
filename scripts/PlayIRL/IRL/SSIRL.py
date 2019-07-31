@@ -63,22 +63,23 @@ class SSIRL(threading.Thread):
             if self.irl_config.evalT > 0 and irl_iter % self.irl_config.evalT == 0:
                 filename = 'env_irl_model{0}.pth.tar'.format(self.irl_config.save_flag)
                 self.save_checkpoint(filename)
-                eval_reward, eval_traj = self.rl_model.policy_evaluation(irl_iter, self.irl_config.bound_r, save_traj=True, name='linear', rname='linear_reward', omega=self.omega)
+                eval_reward, eval_traj, terminals = self.rl_model.policy_evaluation(irl_iter, self.irl_config.bound_r, save_traj=True, name='linear', rname='linear_reward', omega=self.omega)
                 print('itr %d evaluation reward %f' % (irl_iter, eval_reward))
             
             self.calc_omega()
             self.rl_model.policy_iteration(irl_iter, self.irl_config.bound_r, name='linear', rname='linear_reward', omega=self.omega)
-            self.calc_mu_pi(irl_iter, eval_traj)
+            self.calc_mu_pi(irl_iter, eval_traj, terminals)
 
 
-    def calc_mu_pi(self, irl_iter, eval_traj):
+    def calc_mu_pi(self, irl_iter, eval_traj, terminals):
         mus = []
 
         steps = 0
         accu_phi = np.zeros(self.irl_config.feature_dim)
         for i in len(eval_traj):
-            state, terminal = eval_traj[i]
-            phi = self.rl_model.network.feature(np.stack[state], to_numpy=True).flatten()
+            state = eval_traj[i]
+            terminal = terminals[i]
+            phi = self.rl_model.network.feature(np.stack([state]), to_numpy=True).flatten()
             accu_phi = accu_phi+self.policy_config.discount**steps*phi
             if terminal > 0:
                 mus.append(accu_phi)

@@ -24,7 +24,7 @@ sub_tag(tag)
     }
 
     if(sub_tag == "demo") tf_sub = nh.subscribe("tf", 1000, &DataSender::OnDataRecvDemo, this);
-    else if(sub_tag == "train") str_sub = nh.subscribe("irl_trainer_sub", 1000, &DataSender::OnDataRecvTrain, this);
+    else if(sub_tag == "train") str_sub = nh.subscribe("irl_trainer_pub", 1000, &DataSender::OnDataRecvTrain, this);
 
     if(sock_connected) ProcDataRecv();
 }
